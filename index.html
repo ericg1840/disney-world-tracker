@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Disney World Trip Tracker</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏰</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="header-stars" aria-hidden="true"></div>
+  <h1><span class="header-sparkle">✨</span> Disney World Trip Tracker <span class="header-sparkle">✨</span></h1>
+</header>
+
+<main>
+  <section id="countdown-banner" class="countdown-banner hidden"></section>
+
+  <section id="weather-strip" class="weather-strip" aria-label="Weather forecast">
+    <p class="empty-hint">Add trip days below to see the forecast.</p>
+  </section>
+
+  <section id="today-plan-section" class="today-plan-section hidden">
+    <h2 id="today-plan-title">Today's Plan</h2>
+    <div id="today-plan-content" class="today-plan-content"></div>
+  </section>
+
+  <section class="days-section">
+    <div class="days-header">
+      <h2>Your Trip Days</h2>
+      <button id="add-day-btn" class="btn primary">+ Add Day</button>
+    </div>
+    <div id="days-list" class="days-list">
+      <p class="empty-hint">No trip days yet. Tap "+ Add Day" to add your first reservation day.</p>
+    </div>
+  </section>
+</main>
+
+<!-- Add Day Modal -->
+<div id="add-day-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Add Trip Days</h3>
+      <button class="icon-btn close-modal" data-close="add-day-modal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label for="new-day-start">First day of trip</label>
+      <input type="date" id="new-day-start">
+      <label for="new-day-end">Last day of trip</label>
+      <input type="date" id="new-day-end">
+      <p id="add-day-error" class="error-hint hidden"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn primary" id="confirm-add-day">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Day Detail Modal -->
+<div id="day-detail-modal" class="modal-overlay hidden">
+  <div class="modal modal-large">
+    <div class="modal-header">
+      <h3 id="detail-date-title">Day</h3>
+      <button class="icon-btn close-modal" data-close="day-detail-modal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label>Parks <span class="label-hint">(pick one or more — park hopping welcome!)</span></label>
+      <div id="park-picker" class="park-picker"></div>
+
+      <button type="button" id="refresh-wait-times-btn" class="tp-link-btn hidden">🔄 Refresh wait times</button>
+
+      <div id="planned-summary" class="planned-summary hidden">
+        <h4>✅ Planned for this day</h4>
+        <ul id="planned-list" class="planned-list"></ul>
+      </div>
+
+      <input type="text" id="filter-input" class="filter-input hidden" placeholder="Filter rides & restaurants…">
+
+      <p id="park-empty-hint" class="empty-hint">Pick a park above to see rides & restaurants.</p>
+
+      <div id="park-sections" class="park-sections"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn primary" id="save-day-btn">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
