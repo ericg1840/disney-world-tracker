@@ -217,6 +217,20 @@ main {
   margin-bottom: 10px;
 }
 
+.tp-notes {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  margin: 0 0 10px;
+  font-size: 0.86rem;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .tp-park-name {
   font-family: var(--font-heading);
   font-weight: 700;
@@ -382,6 +396,15 @@ main {
   color: var(--muted);
 }
 
+.dc-notes {
+  margin-top: 5px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Always visible (hover affordances don't exist on touch), 40px tap target */
 .day-card-delete {
   position: absolute;
@@ -511,7 +534,8 @@ main {
 }
 
 .modal-body input[type="date"],
-.filter-input {
+.filter-input,
+.day-notes {
   width: 100%;
   padding: 11px 12px;
   border: 1px solid var(--border);
@@ -522,8 +546,15 @@ main {
   color: var(--text);
 }
 
+.day-notes {
+  font-family: inherit;
+  resize: vertical;
+  min-height: 44px;
+}
+
 .modal-body input[type="date"]:focus,
-.filter-input:focus {
+.filter-input:focus,
+.day-notes:focus {
   outline: 2px solid var(--teal);
   outline-offset: -1px;
 }

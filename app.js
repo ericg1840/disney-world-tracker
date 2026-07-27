@@ -77,6 +77,7 @@ function loadTripDays() {
       parkId: undefined,
       attractionPicks: normalizePicks(day.attractionPicks),
       restaurantPicks: normalizePicks(day.restaurantPicks),
+      notes: day.notes || "",
     }));
   } catch (e) {
     return [];
@@ -130,6 +131,11 @@ function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str == null ? "" : str;
   return div.innerHTML;
+}
+
+function truncate(str, maxLen) {
+  if (str.length <= maxLen) return str;
+  return str.slice(0, maxLen - 1).trimEnd() + "…";
 }
 
 function parseIsoDate(dateStr) {
@@ -272,6 +278,7 @@ function renderDaysList() {
       </div>
       <div class="dc-parks">${parksHtml}</div>
       ${pickCount > 0 ? `<div class="dc-picks">${pickCount} item${pickCount === 1 ? "" : "s"} planned</div>` : ""}
+      ${day.notes && day.notes.trim() ? `<div class="dc-notes">📝 ${escapeHtml(truncate(day.notes.trim(), 60))}</div>` : ""}
     `;
 
     card.addEventListener("click", () => openDayDetail(day.id));
@@ -479,6 +486,7 @@ document.getElementById("confirm-add-day").addEventListener("click", () => {
       parkIds: [],
       attractionPicks: [],
       restaurantPicks: [],
+      notes: "",
     });
   }
 
@@ -505,12 +513,22 @@ function openDayDetail(dayId) {
     `${formatWeekday(day.date)}, ${formatDateDisplay(day.date)}`;
 
   document.getElementById("filter-input").value = "";
+  document.getElementById("day-notes").value = day.notes || "";
 
   renderParkPicker(day);
   renderParkSectionsForDay(day);
 
   openModal("day-detail-modal");
 }
+
+document.getElementById("day-notes").addEventListener("change", (e) => {
+  const day = tripDays.find((d) => d.id === activeDayId);
+  if (!day) return;
+  day.notes = e.target.value;
+  saveTripDays();
+  renderDaysList();
+  renderTodayPlan();
+});
 
 function renderParkPicker(day) {
   const picker = document.getElementById("park-picker");
@@ -953,8 +971,12 @@ async function renderTodayPlan() {
   section.classList.remove("hidden");
   document.getElementById("today-plan-title").textContent = `Today's Plan — ${formatDateDisplay(day.date)}`;
 
+  const notesHtml =
+    day.notes && day.notes.trim() ? `<p class="tp-notes">📝 ${escapeHtml(day.notes)}</p>` : "";
+
   if (day.parkIds.length === 0) {
     content.innerHTML = `
+      ${notesHtml}
       <p class="tp-empty">No park picked for today yet.</p>
       <button type="button" class="tp-link-btn" data-open-day="${day.id}">Choose a park →</button>
     `;
@@ -968,6 +990,7 @@ async function renderTodayPlan() {
       <span class="tp-park-name">${parks.map((p) => `${p.emoji} ${p.name}`).join(" + ")}</span>
       <button type="button" class="tp-link-btn" data-open-day="${day.id}">View & edit →</button>
     </div>
+    ${notesHtml}
     <p class="tp-empty">Loading your plans…</p>
   `;
   bindTodayPlanOpenButtons();
