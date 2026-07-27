@@ -77,6 +77,7 @@ function loadTripDays() {
       parkId: undefined,
       attractionPicks: normalizePicks(day.attractionPicks),
       restaurantPicks: normalizePicks(day.restaurantPicks),
+      showPicks: normalizePicks(day.showPicks),
       notes: day.notes || "",
     }));
   } catch (e) {
@@ -114,10 +115,10 @@ function getParkCache(parkId) {
   }
 }
 
-function setParkCache(parkId, attractions, restaurants) {
+function setParkCache(parkId, attractions, restaurants, shows) {
   localStorage.setItem(
     PARK_CACHE_PREFIX + parkId,
-    JSON.stringify({ timestamp: Date.now(), attractions, restaurants })
+    JSON.stringify({ timestamp: Date.now(), attractions, restaurants, shows })
   );
 }
 
@@ -161,6 +162,10 @@ function formatWeekdayShort(dateStr) {
 
 function formatMonthDay(dateStr) {
   return parseIsoDate(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function formatShowTime(isoString) {
+  return new Date(isoString).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
 function daysBetween(aIso, bIso) {
@@ -262,7 +267,8 @@ function renderDaysList() {
     const parks = day.parkIds.map(parkById).filter(Boolean);
     const pickCount =
       (day.attractionPicks ? day.attractionPicks.length : 0) +
-      (day.restaurantPicks ? day.restaurantPicks.length : 0);
+      (day.restaurantPicks ? day.restaurantPicks.length : 0) +
+      (day.showPicks ? day.showPicks.length : 0);
 
     const parksHtml =
       parks.length > 0
@@ -486,6 +492,7 @@ document.getElementById("confirm-add-day").addEventListener("click", () => {
       parkIds: [],
       attractionPicks: [],
       restaurantPicks: [],
+      showPicks: [],
       notes: "",
     });
   }
@@ -559,9 +566,11 @@ function togglePark(parkId) {
       const removeIds = new Set([
         ...items.attractions.map((a) => a.id),
         ...items.restaurants.map((r) => r.id),
+        ...items.shows.map((s) => s.id),
       ]);
       day.attractionPicks = day.attractionPicks.filter((p) => !removeIds.has(p.id));
       day.restaurantPicks = day.restaurantPicks.filter((p) => !removeIds.has(p.id));
+      day.showPicks = day.showPicks.filter((p) => !removeIds.has(p.id));
     }
   }
 
@@ -608,7 +617,7 @@ document.querySelectorAll(".modal-overlay").forEach((overlay) => {
 async function fetchParkItems(parkId) {
   const cached = getParkCache(parkId);
   if (cached) {
-    return { attractions: cached.attractions, restaurants: cached.restaurants };
+    return { attractions: cached.attractions, restaurants: cached.restaurants, shows: cached.shows || [] };
   }
 
   const res = await fetch(`https://api.themeparks.wiki/v1/entity/${parkId}/children`);
@@ -626,27 +635,39 @@ async function fetchParkItems(parkId) {
     .map((c) => ({ id: c.id, name: c.name }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  setParkCache(parkId, attractions, restaurants);
-  return { attractions, restaurants };
+  const shows = children
+    .filter((c) => c.entityType === "SHOW")
+    .map((c) => ({ id: c.id, name: c.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  setParkCache(parkId, attractions, restaurants, shows);
+  return { attractions, restaurants, shows };
 }
 
 async function fetchLiveData(parkId) {
-  const liveMap = new Map();
+  const attractionLive = new Map();
+  const showLive = new Map();
   try {
     const res = await fetch(`https://api.themeparks.wiki/v1/entity/${parkId}/live`);
     if (!res.ok) throw new Error("Failed to load live data");
     const data = await res.json();
     for (const item of data.liveData || []) {
-      if (item.entityType !== "ATTRACTION") continue;
-      liveMap.set(item.id, {
-        status: item.status,
-        waitTime: item.queue && item.queue.STANDBY ? item.queue.STANDBY.waitTime : null,
-      });
+      if (item.entityType === "ATTRACTION") {
+        attractionLive.set(item.id, {
+          status: item.status,
+          waitTime: item.queue && item.queue.STANDBY ? item.queue.STANDBY.waitTime : null,
+        });
+      } else if (item.entityType === "SHOW") {
+        showLive.set(item.id, {
+          status: item.status,
+          showtimes: item.showtimes || [],
+        });
+      }
     }
   } catch (e) {
-    // Live data is best-effort — leave the map empty on failure.
+    // Live data is best-effort — leave the maps empty on failure.
   }
-  return liveMap;
+  return { attractionLive, showLive };
 }
 
 function buildWaitBadge(live) {
@@ -663,6 +684,19 @@ function buildWaitBadge(live) {
     return `<span class="wait-badge ${cls}">${live.waitTime} min</span>`;
   }
   return `<span class="wait-badge wait-open">Open</span>`;
+}
+
+function buildShowSubtitle(live) {
+  if (!live) return "";
+
+  if (live.status === "CLOSED" || live.status === "REFURBISHMENT") {
+    return `<span class="show-times show-times-muted">Not scheduled today</span>`;
+  }
+  if (!live.showtimes || live.showtimes.length === 0) {
+    return `<span class="show-times show-times-muted">No showtime listed</span>`;
+  }
+  const times = live.showtimes.map((s) => formatShowTime(s.startTime)).join(" · ");
+  return `<span class="show-times" title="Reflects today's schedule — check My Disney Experience closer to your date">🕐 ${times}</span>`;
 }
 
 async function renderParkSectionsForDay(day) {
@@ -699,6 +733,11 @@ async function renderParkSectionsForDay(day) {
               <h4>🍽️ Restaurants <span class="count-badge" data-count="restaurants"></span></h4>
               <ul class="item-list" data-list="restaurants"><li class="no-results">Loading…</li></ul>
             </div>
+            <div class="list-column">
+              <h4>🎆 Shows, Parades & Fireworks <span class="count-badge" data-count="shows"></span></h4>
+              <p class="label-hint list-hint">Showtimes reflect today's schedule</p>
+              <ul class="item-list" data-list="shows"><li class="no-results">Loading…</li></ul>
+            </div>
           </div>
         </div>
       `;
@@ -715,13 +754,13 @@ async function loadAndRenderParkSection(parkId) {
   const sectionEl = document.querySelector(`.park-section[data-park-id="${parkId}"]`);
   if (!sectionEl) return;
 
-  let attractions, restaurants;
+  let attractions, restaurants, shows;
   if (activeParkItemsByPark[parkId]) {
-    ({ attractions, restaurants } = activeParkItemsByPark[parkId]);
+    ({ attractions, restaurants, shows } = activeParkItemsByPark[parkId]);
   } else {
     try {
-      ({ attractions, restaurants } = await fetchParkItems(parkId));
-      activeParkItemsByPark[parkId] = { attractions, restaurants };
+      ({ attractions, restaurants, shows } = await fetchParkItems(parkId));
+      activeParkItemsByPark[parkId] = { attractions, restaurants, shows };
     } catch (e) {
       sectionEl.querySelectorAll(".item-list").forEach((ul) => {
         ul.innerHTML = '<li class="no-results">Couldn\'t load park info. Check your connection.</li>';
@@ -730,10 +769,10 @@ async function loadAndRenderParkSection(parkId) {
     }
   }
 
-  let liveMap = activeLiveDataByPark[parkId];
-  if (!liveMap) {
-    liveMap = await fetchLiveData(parkId);
-    activeLiveDataByPark[parkId] = liveMap;
+  let live = activeLiveDataByPark[parkId];
+  if (!live) {
+    live = await fetchLiveData(parkId);
+    activeLiveDataByPark[parkId] = live;
   }
 
   // The modal may have moved on (park removed, day closed) while this was fetching.
@@ -741,13 +780,19 @@ async function loadAndRenderParkSection(parkId) {
   const stillCurrent = document.querySelector(`.park-section[data-park-id="${parkId}"]`);
   if (!day || !stillCurrent || !day.parkIds.includes(parkId)) return;
 
-  renderItemList(stillCurrent.querySelector('[data-list="attractions"]'), attractions, "attractionPicks", liveMap);
+  renderItemList(stillCurrent.querySelector('[data-list="attractions"]'), attractions, "attractionPicks", (item) =>
+    buildWaitBadge(live.attractionLive.get(item.id))
+  );
   renderItemList(stillCurrent.querySelector('[data-list="restaurants"]'), restaurants, "restaurantPicks", null);
+  renderItemList(stillCurrent.querySelector('[data-list="shows"]'), shows, "showPicks", (item) =>
+    buildShowSubtitle(live.showLive.get(item.id))
+  );
   stillCurrent.querySelector('[data-count="attractions"]').textContent = `(${attractions.length})`;
   stillCurrent.querySelector('[data-count="restaurants"]').textContent = `(${restaurants.length})`;
+  stillCurrent.querySelector('[data-count="shows"]').textContent = `(${shows.length})`;
 }
 
-function renderItemList(listEl, items, pickField, liveMap) {
+function renderItemList(listEl, items, pickField, renderExtra) {
   const day = tripDays.find((d) => d.id === activeDayId);
   listEl.innerHTML = "";
 
@@ -756,19 +801,26 @@ function renderItemList(listEl, items, pickField, liveMap) {
     return;
   }
 
+  // Shows get their (long) showtime string under the name; rides get a
+  // short wait-time pill inline after it — same markup, different slot.
+  const isShowList = pickField === "showPicks";
+
   for (const item of items) {
     const isPicked = day[pickField].some((p) => p.id === item.id);
     const li = document.createElement("li");
     li.dataset.itemName = item.name.toLowerCase();
     if (isPicked) li.classList.add("picked");
 
-    const badge = liveMap ? buildWaitBadge(liveMap.get(item.id)) : "";
+    const extra = renderExtra ? renderExtra(item) : "";
 
     li.innerHTML = `
       <label>
         <input type="checkbox" data-item-id="${item.id}" data-pick-field="${pickField}" ${isPicked ? "checked" : ""}>
-        <span>${item.name}</span>
-        ${badge}
+        <span class="item-text">
+          <span class="item-name">${item.name}</span>
+          ${isShowList ? extra : ""}
+        </span>
+        ${!isShowList ? extra : ""}
       </label>
     `;
     listEl.appendChild(li);
@@ -820,11 +872,15 @@ function collectDayPicks(day) {
     if (!items) continue;
     for (const item of items.attractions) {
       const pick = day.attractionPicks.find((p) => p.id === item.id);
-      if (pick) picks.push({ ...item, ...pick, field: "attractionPicks", emoji: "🎢", isAttraction: true });
+      if (pick) picks.push({ ...item, ...pick, field: "attractionPicks", emoji: "🎢", kind: "attraction" });
     }
     for (const item of items.restaurants) {
       const pick = day.restaurantPicks.find((p) => p.id === item.id);
-      if (pick) picks.push({ ...item, ...pick, field: "restaurantPicks", emoji: "🍽️", isAttraction: false });
+      if (pick) picks.push({ ...item, ...pick, field: "restaurantPicks", emoji: "🍽️", kind: "restaurant" });
+    }
+    for (const item of items.shows) {
+      const pick = day.showPicks.find((p) => p.id === item.id);
+      if (pick) picks.push({ ...item, ...pick, field: "showPicks", emoji: "🎆", kind: "show" });
     }
   }
   return picks;
@@ -863,11 +919,18 @@ function renderItinerary() {
   bindItineraryRowEvents();
 }
 
+const ITIN_TIME_PLACEHOLDERS = {
+  attraction: "Return time",
+  restaurant: "Reservation time",
+  show: "Viewing time",
+};
+
 function renderItinRow(item) {
-  const timePlaceholder = item.isAttraction ? "Return time" : "Reservation time";
-  const llToggle = item.isAttraction
-    ? `<label class="itin-ll"><input type="checkbox" class="itin-ll-input" ${item.lightningLane ? "checked" : ""}> ⚡ LL</label>`
-    : "";
+  const timePlaceholder = ITIN_TIME_PLACEHOLDERS[item.kind] || "Time";
+  const llToggle =
+    item.kind === "attraction"
+      ? `<label class="itin-ll"><input type="checkbox" class="itin-ll-input" ${item.lightningLane ? "checked" : ""}> ⚡ LL</label>`
+      : "";
 
   return `
     <div class="itin-row" data-item-id="${item.id}" data-pick-field="${item.field}">
@@ -998,14 +1061,18 @@ async function renderTodayPlan() {
   const picks = [];
   try {
     for (const parkId of day.parkIds) {
-      const { attractions, restaurants } = await fetchParkItems(parkId);
+      const { attractions, restaurants, shows } = await fetchParkItems(parkId);
       for (const item of attractions) {
         const pick = day.attractionPicks.find((p) => p.id === item.id);
-        if (pick) picks.push({ ...item, ...pick, emoji: "🎢", isAttraction: true });
+        if (pick) picks.push({ ...item, ...pick, emoji: "🎢" });
       }
       for (const item of restaurants) {
         const pick = day.restaurantPicks.find((p) => p.id === item.id);
-        if (pick) picks.push({ ...item, ...pick, emoji: "🍽️", isAttraction: false });
+        if (pick) picks.push({ ...item, ...pick, emoji: "🍽️" });
+      }
+      for (const item of shows) {
+        const pick = day.showPicks.find((p) => p.id === item.id);
+        if (pick) picks.push({ ...item, ...pick, emoji: "🎆" });
       }
     }
   } catch (e) {

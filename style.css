@@ -817,18 +817,20 @@ main {
 
 .lists-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* Auto-collapses 3 columns -> 1 as the modal narrows, no breakpoint needed */
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 14px;
-}
-
-@media (max-width: 560px) {
-  .lists-grid { grid-template-columns: 1fr; }
 }
 
 .list-column h4 {
   margin: 0 0 7px;
   font-size: 0.9rem;
   color: var(--purple-dark);
+}
+
+.list-hint {
+  margin: -4px 0 7px;
+  font-size: 0.72rem;
 }
 
 .count-badge {
@@ -869,6 +871,23 @@ main {
   height: 19px;
   flex: 0 0 auto;
   accent-color: var(--teal-dark);
+}
+
+.item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.show-times {
+  font-size: 0.76rem;
+  color: var(--accent-park);
+}
+
+.show-times-muted {
+  color: var(--muted);
+  font-style: italic;
 }
 
 .item-list li.picked { background: #e4f6f8; }
