@@ -14,6 +14,70 @@ const PARKS = [
   { id: "ead53ea5-22e5-4095-9a83-8c29300d7c63", name: "Blizzard Beach", emoji: "❄️" },
 ];
 
+const OTHER_RESORT_VALUE = "__other__";
+
+// No API provides this list, so it's hand-maintained — current as of the
+// 2026 WDW resort lineup. "Other / not listed" covers off-site stays.
+const RESORT_GROUPS = [
+  {
+    label: "Value Resorts",
+    resorts: [
+      "Disney's All-Star Movies Resort",
+      "Disney's All-Star Music Resort",
+      "Disney's All-Star Sports Resort",
+      "Disney's Art of Animation Resort",
+      "Disney's Pop Century Resort",
+    ],
+  },
+  {
+    label: "Moderate Resorts",
+    resorts: [
+      "Disney's Caribbean Beach Resort",
+      "Disney's Coronado Springs Resort",
+      "Disney's Port Orleans Resort – French Quarter",
+      "Disney's Port Orleans Resort – Riverside",
+    ],
+  },
+  {
+    label: "Deluxe Resorts",
+    resorts: [
+      "Disney's Animal Kingdom Lodge",
+      "Disney's Beach Club Resort",
+      "Disney's BoardWalk Inn",
+      "Disney's Contemporary Resort",
+      "Disney's Grand Floridian Resort & Spa",
+      "Disney's Polynesian Village Resort",
+      "Disney's Riviera Resort",
+      "Disney's Wilderness Lodge",
+      "Disney's Yacht Club Resort",
+    ],
+  },
+  {
+    label: "Deluxe Villas (DVC)",
+    resorts: [
+      "Disney's Animal Kingdom Villas – Jambo House",
+      "Disney's Animal Kingdom Villas – Kidani Village",
+      "Bay Lake Tower at Disney's Contemporary Resort",
+      "Disney's BoardWalk Villas",
+      "Copper Creek Villas & Cabins at Disney's Wilderness Lodge",
+      "Disney's Old Key West Resort",
+      "Disney's Saratoga Springs Resort & Spa",
+      "The Villas at Disney's Grand Floridian Resort & Spa",
+      "The Villas at Disney's Wilderness Lodge",
+    ],
+  },
+  {
+    label: "Other Walt Disney World Resorts",
+    resorts: [
+      "Disney's Fort Wilderness Resort & Campground",
+      "Walt Disney World Swan",
+      "Walt Disney World Swan Reserve",
+      "Walt Disney World Dolphin",
+      "Shades of Green",
+    ],
+  },
+];
+
 // Shared by the itinerary editor and Today's Plan — both group picks by
 // type (rides -> shows -> dining) rather than time-of-day.
 const TYPE_SECTIONS = [
@@ -235,8 +299,51 @@ function renderTripInfo() {
   document.getElementById("edit-trip-info-btn").addEventListener("click", openTripInfoModal);
 }
 
+function populateResortSelect() {
+  const select = document.getElementById("trip-info-resort-select");
+  const optgroupsHtml = RESORT_GROUPS.map(
+    (group) => `
+      <optgroup label="${escapeHtml(group.label)}">
+        ${group.resorts.map((r) => `<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join("")}
+      </optgroup>
+    `
+  ).join("");
+  select.innerHTML = `
+    <option value="">Select a resort…</option>
+    ${optgroupsHtml}
+    <option value="${OTHER_RESORT_VALUE}">Other / not listed</option>
+  `;
+}
+
+document.getElementById("trip-info-resort-select").addEventListener("change", (e) => {
+  const otherInput = document.getElementById("trip-info-resort-other");
+  if (e.target.value === OTHER_RESORT_VALUE) {
+    otherInput.classList.remove("hidden");
+    otherInput.focus();
+  } else {
+    otherInput.classList.add("hidden");
+  }
+});
+
 function openTripInfoModal() {
-  document.getElementById("trip-info-resort").value = tripInfo.resort || "";
+  const select = document.getElementById("trip-info-resort-select");
+  const otherInput = document.getElementById("trip-info-resort-other");
+  const knownResorts = RESORT_GROUPS.flatMap((g) => g.resorts);
+
+  if (tripInfo.resort && knownResorts.includes(tripInfo.resort)) {
+    select.value = tripInfo.resort;
+    otherInput.value = "";
+    otherInput.classList.add("hidden");
+  } else if (tripInfo.resort) {
+    select.value = OTHER_RESORT_VALUE;
+    otherInput.value = tripInfo.resort;
+    otherInput.classList.remove("hidden");
+  } else {
+    select.value = "";
+    otherInput.value = "";
+    otherInput.classList.add("hidden");
+  }
+
   document.getElementById("trip-info-confirmation").value = tripInfo.confirmation || "";
   document.getElementById("trip-info-checkin").value = tripInfo.checkIn || "";
   document.getElementById("trip-info-checkout").value = tripInfo.checkOut || "";
@@ -244,8 +351,12 @@ function openTripInfoModal() {
 }
 
 document.getElementById("save-trip-info-btn").addEventListener("click", () => {
+  const select = document.getElementById("trip-info-resort-select");
+  const otherInput = document.getElementById("trip-info-resort-other");
+  const resort = select.value === OTHER_RESORT_VALUE ? otherInput.value.trim() : select.value;
+
   tripInfo = {
-    resort: document.getElementById("trip-info-resort").value.trim(),
+    resort,
     confirmation: document.getElementById("trip-info-confirmation").value.trim(),
     checkIn: document.getElementById("trip-info-checkin").value,
     checkOut: document.getElementById("trip-info-checkout").value,
@@ -1144,6 +1255,7 @@ function bindTodayPlanOpenButtons() {
 
 function init() {
   sortDays();
+  populateResortSelect();
   renderTripInfo();
   renderDaysList();
   renderWeatherStrip();

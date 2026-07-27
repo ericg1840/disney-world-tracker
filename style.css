@@ -534,6 +534,8 @@ main {
 }
 
 .modal-body input[type="date"],
+.modal-body select,
+.text-field,
 .filter-input,
 .day-notes {
   width: 100%;
@@ -553,6 +555,8 @@ main {
 }
 
 .modal-body input[type="date"]:focus,
+.modal-body select:focus,
+.text-field:focus,
 .filter-input:focus,
 .day-notes:focus {
   outline: 2px solid var(--teal);

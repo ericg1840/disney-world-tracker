@@ -53,11 +53,12 @@
       <button class="icon-btn close-modal" data-close="trip-info-modal">&times;</button>
     </div>
     <div class="modal-body">
-      <label for="trip-info-resort">Resort</label>
-      <input type="text" id="trip-info-resort" placeholder="e.g. Disney's Polynesian Village Resort">
+      <label for="trip-info-resort-select">Resort</label>
+      <select id="trip-info-resort-select"></select>
+      <input type="text" id="trip-info-resort-other" class="text-field hidden" placeholder="Enter resort name">
 
       <label for="trip-info-confirmation">Confirmation number</label>
-      <input type="text" id="trip-info-confirmation" placeholder="e.g. 1234567890">
+      <input type="text" id="trip-info-confirmation" class="text-field" placeholder="e.g. 1234567890">
 
       <label for="trip-info-checkin">Check-in date</label>
       <input type="date" id="trip-info-checkin">
