@@ -238,6 +238,13 @@ main {
   color: var(--purple-dark);
 }
 
+.tp-park-hours {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-weight: 400;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
 .tp-itinerary {
   display: flex;
   flex-direction: column;
@@ -835,11 +842,22 @@ main {
 }
 
 .park-section-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
   font-family: var(--font-heading);
   font-weight: 700;
   color: var(--purple-dark);
   margin: 0 0 10px;
   font-size: 1rem;
+}
+
+.park-hours {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-weight: 400;
+  font-size: 0.78rem;
+  color: var(--muted);
 }
 
 .lists-grid {

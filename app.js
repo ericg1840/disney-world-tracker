@@ -123,6 +123,7 @@ let tripInfo = loadTripInfo();
 let activeDayId = null;
 let activeParkItemsByPark = {}; // parkId -> { attractions, restaurants }
 let activeLiveDataByPark = {}; // parkId -> Map(attractionId -> { status, waitTime })
+let parkHoursByPark = {}; // parkId -> Map(date -> { openingTime, closingTime }) — module-wide, not reset per modal open
 
 // ---------- Persistence ----------
 
@@ -826,6 +827,34 @@ async function fetchLiveData(parkId) {
   return { attractionLive, showLive };
 }
 
+// Disney only publishes operating hours roughly a month out, so a day
+// further out than that will just have no entry in the returned map.
+async function fetchParkHours(parkId) {
+  if (parkHoursByPark[parkId]) return parkHoursByPark[parkId];
+
+  const hoursByDate = new Map();
+  try {
+    const res = await fetch(`https://api.themeparks.wiki/v1/entity/${parkId}/schedule`);
+    if (!res.ok) throw new Error("Failed to load park schedule");
+    const data = await res.json();
+    for (const entry of data.schedule || []) {
+      if (entry.type !== "OPERATING" || hoursByDate.has(entry.date)) continue;
+      hoursByDate.set(entry.date, { openingTime: entry.openingTime, closingTime: entry.closingTime });
+    }
+  } catch (e) {
+    // Best-effort — an empty map just means no hours get shown.
+  }
+
+  parkHoursByPark[parkId] = hoursByDate;
+  return hoursByDate;
+}
+
+function formatParkHoursText(hoursByDate, dateStr) {
+  const entry = hoursByDate.get(dateStr);
+  if (!entry || !entry.openingTime || !entry.closingTime) return null;
+  return `${formatShowTime(entry.openingTime)} – ${formatShowTime(entry.closingTime)}`;
+}
+
 function buildWaitBadge(live) {
   if (!live) return "";
 
@@ -934,10 +963,21 @@ async function loadAndRenderParkSection(parkId) {
     activeLiveDataByPark[parkId] = live;
   }
 
+  const hoursByDate = await fetchParkHours(parkId);
+
   // The modal may have moved on (park removed, day closed) while this was fetching.
   const day = tripDays.find((d) => d.id === activeDayId);
   const stillCurrent = document.querySelector(`.park-section[data-park-id="${parkId}"]`);
   if (!day || !stillCurrent || !day.parkIds.includes(parkId)) return;
+
+  const titleEl = stillCurrent.querySelector(".park-section-title");
+  if (titleEl) {
+    const hoursText = formatParkHoursText(hoursByDate, day.date);
+    const hoursSpan = document.createElement("span");
+    hoursSpan.className = "park-hours";
+    hoursSpan.textContent = hoursText || "Hours not posted yet";
+    titleEl.appendChild(hoursSpan);
+  }
 
   renderItemList(stillCurrent.querySelector('[data-list="attractions"]'), attractions, "attractionPicks", (item) =>
     buildWaitBadge(live.attractionLive.get(item.id))
@@ -1199,9 +1239,19 @@ async function renderTodayPlan() {
   }
 
   const parks = day.parkIds.map(parkById).filter(Boolean);
+  const parkNamesHtml = (
+    await Promise.all(
+      parks.map(async (p) => {
+        const hoursByDate = await fetchParkHours(p.id);
+        const hoursText = formatParkHoursText(hoursByDate, day.date);
+        return `${p.emoji} ${p.name} <span class="tp-park-hours">${hoursText || "hours not posted yet"}</span>`;
+      })
+    )
+  ).join(" + ");
+
   content.innerHTML = `
     <div class="tp-park-row">
-      <span class="tp-park-name">${parks.map((p) => `${p.emoji} ${p.name}`).join(" + ")}</span>
+      <span class="tp-park-name">${parkNamesHtml}</span>
       <button type="button" class="tp-link-btn" data-open-day="${day.id}">View & edit →</button>
     </div>
     ${notesHtml}
