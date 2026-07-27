@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -21,6 +22,10 @@
 </header>
 
 <main>
+  <section id="sync-section" class="trip-info-section">
+    <div id="sync-content" class="trip-info-content"></div>
+  </section>
+
   <section id="trip-info-section" class="trip-info-section">
     <div id="trip-info-content" class="trip-info-content"></div>
   </section>
@@ -44,6 +49,37 @@
     </div>
   </section>
 </main>
+
+<!-- Cloud Sync Modal -->
+<div id="sync-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>☁️ Cloud Sync</h3>
+      <button class="icon-btn close-modal" data-close="sync-modal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="empty-hint">Connect once, then enter the same sync code on each device to see this trip everywhere. Treat the code like a private share link — anyone who has it can view and edit this trip.</p>
+
+      <label for="sync-url">Supabase project URL</label>
+      <input type="text" id="sync-url" class="text-field" placeholder="https://xxxxx.supabase.co">
+
+      <label for="sync-anon-key">Supabase anon public key</label>
+      <input type="text" id="sync-anon-key" class="text-field" placeholder="eyJhbGciOi...">
+
+      <label for="sync-code-input">Sync code</label>
+      <div class="sync-code-row">
+        <input type="text" id="sync-code-input" class="text-field sync-code-field" placeholder="e.g. 7F3KQPXZ">
+        <button type="button" class="btn primary" id="generate-sync-code-btn">Generate</button>
+      </div>
+
+      <p id="sync-status-msg" class="empty-hint"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn danger hidden" id="disconnect-sync-btn">Disconnect</button>
+      <button class="btn primary" id="connect-sync-btn">Connect & Sync</button>
+    </div>
+  </div>
+</div>
 
 <!-- Trip Info Modal -->
 <div id="trip-info-modal" class="modal-overlay hidden">

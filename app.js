@@ -88,6 +88,7 @@ const TYPE_SECTIONS = [
 
 const STORAGE_KEY = "disneyTripDays";
 const TRIP_INFO_KEY = "disneyTripInfo";
+const EMPTY_TRIP_INFO = { resort: "", confirmation: "", checkIn: "", checkOut: "" };
 const PARK_CACHE_PREFIX = "disneyParkCache_";
 const PARK_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -131,19 +132,25 @@ function normalizePicks(picks) {
   return (picks || []).map((p) => (typeof p === "string" ? { id: p, time: "", lightningLane: false } : p));
 }
 
+// Shared by loading from localStorage and pulling from the cloud — both are
+// just "an array of day objects from somewhere else" that need the same
+// shape guarantees.
+function normalizeTripDaysArray(parsed) {
+  return (parsed || []).map((day) => ({
+    ...day,
+    parkIds: day.parkIds || (day.parkId ? [day.parkId] : []),
+    parkId: undefined,
+    attractionPicks: normalizePicks(day.attractionPicks),
+    restaurantPicks: normalizePicks(day.restaurantPicks),
+    showPicks: normalizePicks(day.showPicks),
+    notes: day.notes || "",
+  }));
+}
+
 function loadTripDays() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return parsed.map((day) => ({
-      ...day,
-      parkIds: day.parkIds || (day.parkId ? [day.parkId] : []),
-      parkId: undefined,
-      attractionPicks: normalizePicks(day.attractionPicks),
-      restaurantPicks: normalizePicks(day.restaurantPicks),
-      showPicks: normalizePicks(day.showPicks),
-      notes: day.notes || "",
-    }));
+    return normalizeTripDaysArray(raw ? JSON.parse(raw) : []);
   } catch (e) {
     return [];
   }
@@ -151,21 +158,217 @@ function loadTripDays() {
 
 function saveTripDays() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tripDays));
+  scheduleCloudPush();
 }
 
 function loadTripInfo() {
-  const empty = { resort: "", confirmation: "", checkIn: "", checkOut: "" };
   try {
     const raw = localStorage.getItem(TRIP_INFO_KEY);
-    return raw ? { ...empty, ...JSON.parse(raw) } : empty;
+    return raw ? { ...EMPTY_TRIP_INFO, ...JSON.parse(raw) } : { ...EMPTY_TRIP_INFO };
   } catch (e) {
-    return empty;
+    return { ...EMPTY_TRIP_INFO };
   }
 }
 
 function saveTripInfo() {
   localStorage.setItem(TRIP_INFO_KEY, JSON.stringify(tripInfo));
+  scheduleCloudPush();
 }
+
+// ---------- Cloud Sync ----------
+//
+// No login: each trip is keyed by a random "sync code" entered on every
+// device, like an unlisted share link. The Supabase table has row-level
+// security with no policies (default deny) — the only access path is two
+// RPC functions (get_trip/upsert_trip) that always require the caller to
+// already know the specific code, so the public anon key can't be used to
+// list or guess other people's trips. See supabase-setup.sql.
+
+const SYNC_CONFIG_KEY = "disneySyncConfig"; // { url, anonKey, code }
+const SYNC_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I/l
+
+let syncConfig = loadSyncConfig();
+let supabaseClient = null;
+let cloudPushTimer = null;
+
+function loadSyncConfig() {
+  try {
+    const raw = localStorage.getItem(SYNC_CONFIG_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveSyncConfig() {
+  if (syncConfig) {
+    localStorage.setItem(SYNC_CONFIG_KEY, JSON.stringify(syncConfig));
+  } else {
+    localStorage.removeItem(SYNC_CONFIG_KEY);
+  }
+}
+
+function generateSyncCode() {
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => SYNC_CODE_ALPHABET[b % SYNC_CODE_ALPHABET.length]).join("");
+}
+
+function getSupabaseClient() {
+  if (!syncConfig || !syncConfig.url || !syncConfig.anonKey) return null;
+  if (!supabaseClient) {
+    try {
+      // Throws on a malformed URL, and window.supabase won't exist at all
+      // if the CDN script was blocked or the device is offline.
+      supabaseClient = window.supabase.createClient(syncConfig.url, syncConfig.anonKey);
+    } catch (e) {
+      console.error("Couldn't create Supabase client:", e);
+      return null;
+    }
+  }
+  return supabaseClient;
+}
+
+// Fire-and-forget, debounced so a burst of picks/edits collapses into one
+// network call instead of one per click. Failures are best-effort — the
+// local copy (already saved by the caller) stays the source of truth on
+// this device either way.
+function scheduleCloudPush() {
+  if (!syncConfig || !syncConfig.code) return;
+  clearTimeout(cloudPushTimer);
+  cloudPushTimer = setTimeout(() => {
+    pushToCloud();
+  }, 800);
+}
+
+async function pushToCloud() {
+  const client = getSupabaseClient();
+  if (!client || !syncConfig.code) return false;
+  try {
+    const { error } = await client.rpc("upsert_trip", {
+      p_code: syncConfig.code,
+      p_days: tripDays,
+      p_info: tripInfo,
+    });
+    if (error) throw error;
+    return true;
+  } catch (e) {
+    console.error("Cloud sync push failed:", e);
+    return false;
+  }
+}
+
+// Returns true if a row for this code existed and was loaded, false if the
+// code is brand new (nothing to pull yet) or the request failed.
+async function pullFromCloud() {
+  const client = getSupabaseClient();
+  if (!client || !syncConfig.code) return false;
+  try {
+    const { data, error } = await client.rpc("get_trip", { p_code: syncConfig.code });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) return false;
+
+    tripDays = normalizeTripDaysArray(row.trip_days || []);
+    tripInfo = { ...EMPTY_TRIP_INFO, ...(row.trip_info || {}) };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tripDays));
+    localStorage.setItem(TRIP_INFO_KEY, JSON.stringify(tripInfo));
+    return true;
+  } catch (e) {
+    console.error("Cloud sync pull failed:", e);
+    return false;
+  }
+}
+
+function renderSyncSection() {
+  const content = document.getElementById("sync-content");
+  if (syncConfig && syncConfig.code) {
+    content.innerHTML = `
+      <div class="trip-info-card">
+        <div>
+          <div class="ti-resort">☁️ Cloud sync on</div>
+          <div class="ti-details">Code: <strong>${escapeHtml(syncConfig.code)}</strong> — enter this on your other device</div>
+        </div>
+        <button type="button" class="tp-link-btn" id="open-sync-btn">Manage</button>
+      </div>
+    `;
+  } else {
+    content.innerHTML = `
+      <div class="trip-info-empty">
+        <p>☁️ View this trip on your phone & laptop</p>
+        <button type="button" class="btn primary" id="open-sync-btn">Set up sync</button>
+      </div>
+    `;
+  }
+  document.getElementById("open-sync-btn").addEventListener("click", openSyncModal);
+}
+
+function setSyncStatusMsg(message) {
+  document.getElementById("sync-status-msg").textContent = message;
+}
+
+function openSyncModal() {
+  document.getElementById("sync-url").value = syncConfig ? syncConfig.url : "";
+  document.getElementById("sync-anon-key").value = syncConfig ? syncConfig.anonKey : "";
+  document.getElementById("sync-code-input").value = syncConfig ? syncConfig.code : "";
+  setSyncStatusMsg("");
+  document.getElementById("disconnect-sync-btn").classList.toggle("hidden", !syncConfig);
+  openModal("sync-modal");
+}
+
+document.getElementById("generate-sync-code-btn").addEventListener("click", () => {
+  document.getElementById("sync-code-input").value = generateSyncCode();
+});
+
+document.getElementById("connect-sync-btn").addEventListener("click", async () => {
+  const url = document.getElementById("sync-url").value.trim();
+  const anonKey = document.getElementById("sync-anon-key").value.trim();
+  const code = document.getElementById("sync-code-input").value.trim().toUpperCase();
+
+  if (!url || !anonKey || !code) {
+    setSyncStatusMsg("Please fill in all three fields.");
+    return;
+  }
+
+  syncConfig = { url, anonKey, code };
+  supabaseClient = null; // force re-init against the (possibly new) config
+
+  setSyncStatusMsg("Connecting…");
+  const pulled = await pullFromCloud();
+
+  if (pulled) {
+    saveSyncConfig();
+    setSyncStatusMsg("Connected! Loaded your existing trip from the cloud.");
+    renderAll();
+  } else if (getSupabaseClient()) {
+    // Either a brand-new code, or the pull failed — either way, try pushing
+    // this device's current data up so the code has something behind it.
+    const pushed = await pushToCloud();
+    if (pushed) {
+      saveSyncConfig();
+      setSyncStatusMsg("Connected! This device's trip is now saved to the cloud.");
+    } else {
+      setSyncStatusMsg("Couldn't reach Supabase — double-check the URL and anon key.");
+      syncConfig = null;
+      return;
+    }
+  } else {
+    setSyncStatusMsg("Couldn't connect — double-check the URL and anon key.");
+    syncConfig = null;
+    return;
+  }
+
+  renderSyncSection();
+  setTimeout(() => closeModal("sync-modal"), 1400);
+});
+
+document.getElementById("disconnect-sync-btn").addEventListener("click", () => {
+  syncConfig = null;
+  saveSyncConfig();
+  supabaseClient = null;
+  renderSyncSection();
+  closeModal("sync-modal");
+});
 
 function getParkCache(parkId) {
   try {
@@ -1355,14 +1558,26 @@ function bindTodayPlanOpenButtons() {
 
 // ---------- Init ----------
 
-function init() {
+function renderAll() {
   sortDays();
-  populateResortSelect();
   renderTripInfo();
   renderDaysList();
   renderWeatherStrip();
   renderTodayPlan();
   renderCountdownBanner();
+}
+
+async function init() {
+  populateResortSelect();
+  renderSyncSection();
+  renderAll();
+
+  // If sync was already set up on a previous visit, pull the latest before
+  // the user starts editing — another device may have changed things since.
+  if (syncConfig && syncConfig.code) {
+    const pulled = await pullFromCloud();
+    if (pulled) renderAll();
+  }
 }
 
 init();

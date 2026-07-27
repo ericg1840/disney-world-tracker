@@ -822,6 +822,23 @@ main {
   font-size: 0.98rem;
 }
 
+.sync-code-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.sync-code-row .sync-code-field {
+  margin-bottom: 0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-family: var(--font-heading);
+}
+
+.sync-code-row .btn {
+  flex: 0 0 auto;
+}
+
 .ti-details {
   font-size: 0.82rem;
   color: var(--muted);
