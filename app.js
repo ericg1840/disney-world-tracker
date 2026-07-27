@@ -190,6 +190,33 @@ function groupPicksByPeriod(picks) {
   return groups;
 }
 
+// Today's Plan groups by type instead of period (rides -> shows -> dining),
+// since "what am I doing" reads more naturally by category on a quick glance
+// than by time-of-day for a single day.
+const TODAY_PLAN_TYPE_SECTIONS = [
+  { id: "attraction", label: "🎢 Rides & Attractions" },
+  { id: "show", label: "🎆 Shows, Parades & Fireworks" },
+  { id: "restaurant", label: "🍽️ Restaurants" },
+];
+
+function groupPicksByKind(picks) {
+  const groups = { attraction: [], show: [], restaurant: [] };
+  for (const p of picks) {
+    (groups[p.kind] || groups.attraction).push(p);
+  }
+  return groups;
+}
+
+function buildTodayPlanChipText(item) {
+  if (item.kind === "attraction") {
+    // Rides just get a Lightning Lane flag, if set — no time, since return
+    // times are per-trip planning detail, not a glance-and-go summary.
+    return `${item.emoji} ${item.name}${item.lightningLane ? " ⚡" : ""}`;
+  }
+  const timeStr = item.time ? ` · ${escapeHtml(item.time)}` : "";
+  return `${item.emoji} ${item.name}${timeStr}`;
+}
+
 // ---------- Rendering: Trip info (resort & confirmation) ----------
 
 function renderTripInfo() {
@@ -1114,11 +1141,11 @@ async function renderTodayPlan() {
       const { attractions, restaurants, shows } = await fetchParkItems(parkId);
       for (const item of attractions) {
         const pick = day.attractionPicks.find((p) => p.id === item.id);
-        if (pick) picks.push({ ...item, ...pick, emoji: "🎢" });
+        if (pick) picks.push({ ...item, ...pick, emoji: "🎢", kind: "attraction" });
       }
       for (const item of restaurants) {
         const pick = day.restaurantPicks.find((p) => p.id === item.id);
-        if (pick) picks.push({ ...item, ...pick, emoji: "🍽️" });
+        if (pick) picks.push({ ...item, ...pick, emoji: "🍽️", kind: "restaurant" });
       }
       const pickedShows = shows.filter((item) => day.showPicks.some((p) => p.id === item.id));
       if (pickedShows.length > 0) {
@@ -1130,7 +1157,7 @@ async function renderTodayPlan() {
             ...item,
             ...pick,
             emoji: "🎆",
-            period: deriveShowPeriod(live),
+            kind: "show",
             time: formatShowTimesText(live),
           });
         }
@@ -1146,21 +1173,15 @@ async function renderTodayPlan() {
   if (picks.length === 0) {
     resultEl.innerHTML = '<p class="tp-empty">Nothing planned yet — tap "View & edit" to add rides or restaurants.</p>';
   } else {
-    const groups = groupPicksByPeriod(picks);
+    const groups = groupPicksByKind(picks);
     resultEl.className = "tp-itinerary";
-    resultEl.innerHTML = PERIOD_SECTIONS.filter((s) => groups[s.id].length > 0)
+    resultEl.innerHTML = TODAY_PLAN_TYPE_SECTIONS.filter((s) => groups[s.id].length > 0)
       .map(
         (s) => `
           <div class="tp-period-group">
             <div class="tp-period-label">${s.label}</div>
             <div class="tp-groups">
-              ${groups[s.id]
-                .map((item) => {
-                  const timeStr = item.time ? ` · ${escapeHtml(item.time)}` : "";
-                  const llStr = item.lightningLane ? " ⚡" : "";
-                  return `<span class="tp-chip">${item.emoji} ${item.name}${timeStr}${llStr}</span>`;
-                })
-                .join("")}
+              ${groups[s.id].map((item) => `<span class="tp-chip">${buildTodayPlanChipText(item)}</span>`).join("")}
             </div>
           </div>
         `
