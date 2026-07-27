@@ -231,6 +231,17 @@ function formatShowTime(isoString) {
   return new Date(isoString).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 }
 
+// <input type="time"> stores "HH:MM" in 24-hour form regardless of locale —
+// reformat that for display (e.g. "18:30" -> "6:30 PM").
+function formatReservationTime(hhmm) {
+  if (!hhmm) return "";
+  const [h, m] = hhmm.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return hhmm;
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
 function daysBetween(aIso, bIso) {
   const a = parseIsoDate(aIso);
   const b = parseIsoDate(bIso);
@@ -259,7 +270,10 @@ function buildTodayPlanChipText(item) {
     // times are per-trip planning detail, not a glance-and-go summary.
     return `${item.emoji} ${item.name}${item.lightningLane ? " ⚡" : ""}`;
   }
-  const timeStr = item.time ? ` · ${escapeHtml(item.time)}` : "";
+  // Shows already carry a display-formatted time string; restaurants store
+  // a raw "HH:MM" from the time picker that still needs formatting.
+  const displayTime = item.kind === "restaurant" ? formatReservationTime(item.time) : item.time;
+  const timeStr = displayTime ? ` · ${escapeHtml(displayTime)}` : "";
   return `${item.emoji} ${item.name}${timeStr}`;
 }
 
@@ -666,7 +680,6 @@ function openDayDetail(dayId) {
   document.getElementById("detail-date-title").textContent =
     `${formatWeekday(day.date)}, ${formatDateDisplay(day.date)}`;
 
-  document.getElementById("filter-input").value = "";
   document.getElementById("day-notes").value = day.notes || "";
 
   renderParkPicker(day);
@@ -728,10 +741,6 @@ function togglePark(parkId) {
   renderWeatherStrip();
   renderTodayPlan();
 }
-
-document.getElementById("filter-input").addEventListener("input", (e) => {
-  applyFilter(e.target.value);
-});
 
 document.getElementById("refresh-wait-times-btn").addEventListener("click", () => {
   const day = tripDays.find((d) => d.id === activeDayId);
@@ -857,20 +866,17 @@ function buildShowSubtitle(live) {
 async function renderParkSectionsForDay(day) {
   const sectionsEl = document.getElementById("park-sections");
   const emptyHint = document.getElementById("park-empty-hint");
-  const filterInput = document.getElementById("filter-input");
   const refreshBtn = document.getElementById("refresh-wait-times-btn");
 
   if (day.parkIds.length === 0) {
     sectionsEl.innerHTML = "";
     emptyHint.classList.remove("hidden");
-    filterInput.classList.add("hidden");
     refreshBtn.classList.add("hidden");
     renderItinerary();
     return;
   }
 
   emptyHint.classList.add("hidden");
-  filterInput.classList.remove("hidden");
   refreshBtn.classList.remove("hidden");
 
   sectionsEl.innerHTML = day.parkIds
@@ -889,8 +895,7 @@ async function renderParkSectionsForDay(day) {
               <ul class="item-list" data-list="restaurants"><li class="no-results">Loading…</li></ul>
             </div>
             <div class="list-column">
-              <h4>🎆 Shows, Parades & Fireworks <span class="count-badge" data-count="shows"></span></h4>
-              <p class="label-hint list-hint">Showtimes reflect today's schedule</p>
+              <h4 title="Showtimes reflect today's schedule">🎆 Shows, Parades & Fireworks <span class="count-badge" data-count="shows"></span></h4>
               <ul class="item-list" data-list="shows"><li class="no-results">Loading…</li></ul>
             </div>
           </div>
@@ -902,7 +907,6 @@ async function renderParkSectionsForDay(day) {
   await Promise.all(day.parkIds.map((parkId) => loadAndRenderParkSection(parkId)));
 
   renderItinerary();
-  applyFilter(filterInput.value);
 }
 
 async function loadAndRenderParkSection(parkId) {
@@ -963,7 +967,6 @@ function renderItemList(listEl, items, pickField, renderExtra) {
   for (const item of items) {
     const isPicked = day[pickField].some((p) => p.id === item.id);
     const li = document.createElement("li");
-    li.dataset.itemName = item.name.toLowerCase();
     if (isPicked) li.classList.add("picked");
 
     const extra = renderExtra ? renderExtra(item) : "";
@@ -1008,14 +1011,6 @@ function handlePickToggle(e) {
   renderItinerary();
   renderDaysList();
   renderTodayPlan();
-}
-
-function applyFilter(query) {
-  const q = query.trim().toLowerCase();
-  document.querySelectorAll("#park-sections .item-list li").forEach((li) => {
-    if (!li.dataset.itemName) return;
-    li.style.display = li.dataset.itemName.includes(q) ? "" : "none";
-  });
 }
 
 // ---------- Itinerary (editable: period, time, Lightning Lane) ----------
@@ -1095,7 +1090,7 @@ function renderItinRow(item) {
   if (item.kind === "attraction") {
     mainExtra = `<label class="itin-ll"><input type="checkbox" class="itin-ll-input" ${item.lightningLane ? "checked" : ""}> ⚡ LL</label>`;
   } else if (item.kind === "restaurant") {
-    controls = `<input type="text" class="itin-time" placeholder="Reservation time">`;
+    controls = `<input type="time" class="itin-time">`;
   } else if (item.kind === "show") {
     controls = `<span class="itin-show-time" title="Reflects today's schedule — check My Disney Experience closer to your date">🕐 ${item.showTimesText}</span>`;
   }
@@ -1124,8 +1119,8 @@ function bindItineraryRowEvents() {
 
     const timeInput = row.querySelector(".itin-time");
     if (timeInput) {
-      // Set via property, not a template attribute, so quotes/special chars
-      // in user-typed times can't break the surrounding markup.
+      // Set via property, not a template attribute — also more robust than
+      // interpolating into the HTML string for a value the browser owns.
       timeInput.value = pick.time || "";
       timeInput.addEventListener("change", () => {
         updatePick(itemId, field, { time: timeInput.value });
