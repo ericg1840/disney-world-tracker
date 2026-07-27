@@ -355,6 +355,9 @@ document.getElementById("save-trip-info-btn").addEventListener("click", () => {
   const otherInput = document.getElementById("trip-info-resort-other");
   const resort = select.value === OTHER_RESORT_VALUE ? otherInput.value.trim() : select.value;
 
+  const previousCheckIn = tripInfo.checkIn;
+  const previousCheckOut = tripInfo.checkOut;
+
   tripInfo = {
     resort,
     confirmation: document.getElementById("trip-info-confirmation").value.trim(),
@@ -362,8 +365,22 @@ document.getElementById("save-trip-info-btn").addEventListener("click", () => {
     checkOut: document.getElementById("trip-info-checkout").value,
   };
   saveTripInfo();
+
+  // Check-in/check-out double as a quick-start for trip days — but only
+  // when those dates actually changed. Re-saving unrelated fields (e.g. a
+  // confirmation number edit) with the same dates would otherwise silently
+  // resurrect a day the user deliberately deleted.
+  const datesChanged = tripInfo.checkIn !== previousCheckIn || tripInfo.checkOut !== previousCheckOut;
+  if (datesChanged && tripInfo.checkIn && tripInfo.checkOut && tripInfo.checkOut >= tripInfo.checkIn) {
+    addMissingTripDays(tripInfo.checkIn, tripInfo.checkOut);
+  }
+
   closeModal("trip-info-modal");
   renderTripInfo();
+  renderDaysList();
+  renderWeatherStrip();
+  renderTodayPlan();
+  renderCountdownBanner();
 });
 
 // ---------- Rendering: Days list ----------
@@ -590,6 +607,31 @@ function dateRange(startStr, endStr) {
   return dates;
 }
 
+// Shared by "+ Add Day" and the resort check-in/check-out autofill — skips
+// dates that already exist, so calling it repeatedly is safe (idempotent).
+function addMissingTripDays(startStr, endStr) {
+  const existingDates = new Set(tripDays.map((d) => d.date));
+  let added = false;
+  for (const dateStr of dateRange(startStr, endStr)) {
+    if (existingDates.has(dateStr)) continue;
+    tripDays.push({
+      id: uid(),
+      date: dateStr,
+      parkIds: [],
+      attractionPicks: [],
+      restaurantPicks: [],
+      showPicks: [],
+      notes: "",
+    });
+    added = true;
+  }
+  if (added) {
+    sortDays();
+    saveTripDays();
+  }
+  return added;
+}
+
 document.getElementById("confirm-add-day").addEventListener("click", () => {
   const startVal = document.getElementById("new-day-start").value;
   const endVal = document.getElementById("new-day-end").value;
@@ -603,22 +645,7 @@ document.getElementById("confirm-add-day").addEventListener("click", () => {
     return;
   }
 
-  const existingDates = new Set(tripDays.map((d) => d.date));
-  for (const dateStr of dateRange(startVal, endVal)) {
-    if (existingDates.has(dateStr)) continue;
-    tripDays.push({
-      id: uid(),
-      date: dateStr,
-      parkIds: [],
-      attractionPicks: [],
-      restaurantPicks: [],
-      showPicks: [],
-      notes: "",
-    });
-  }
-
-  sortDays();
-  saveTripDays();
+  addMissingTripDays(startVal, endVal);
   closeModal("add-day-modal");
   renderDaysList();
   renderWeatherStrip();
