@@ -266,12 +266,33 @@ main {
 .tp-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   background: white;
   border: 1px solid var(--border);
   border-radius: 999px;
-  padding: 5px 11px;
+  padding: 5px 6px 5px 11px;
   font-size: 0.84rem;
+}
+
+.tp-chip-remove {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.tp-chip-remove:hover {
+  background: #fdecea;
+  color: var(--danger);
 }
 
 .tp-empty {

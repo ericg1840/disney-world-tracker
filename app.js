@@ -1215,11 +1215,11 @@ async function renderTodayPlan() {
       const { attractions, restaurants, shows } = await fetchParkItems(parkId);
       for (const item of attractions) {
         const pick = day.attractionPicks.find((p) => p.id === item.id);
-        if (pick) picks.push({ ...item, ...pick, emoji: "🎢", kind: "attraction" });
+        if (pick) picks.push({ ...item, ...pick, emoji: "🎢", kind: "attraction", field: "attractionPicks" });
       }
       for (const item of restaurants) {
         const pick = day.restaurantPicks.find((p) => p.id === item.id);
-        if (pick) picks.push({ ...item, ...pick, emoji: "🍽️", kind: "restaurant" });
+        if (pick) picks.push({ ...item, ...pick, emoji: "🍽️", kind: "restaurant", field: "restaurantPicks" });
       }
       const pickedShows = shows.filter((item) => day.showPicks.some((p) => p.id === item.id));
       if (pickedShows.length > 0) {
@@ -1232,6 +1232,7 @@ async function renderTodayPlan() {
             ...pick,
             emoji: "🎆",
             kind: "show",
+            field: "showPicks",
             time: formatShowTimesText(live),
           });
         }
@@ -1255,16 +1256,45 @@ async function renderTodayPlan() {
           <div class="tp-period-group">
             <div class="tp-period-label">${s.label}</div>
             <div class="tp-groups">
-              ${groups[s.id].map((item) => `<span class="tp-chip">${buildTodayPlanChipText(item)}</span>`).join("")}
+              ${groups[s.id]
+                .map(
+                  (item) => `
+                    <span class="tp-chip">
+                      ${buildTodayPlanChipText(item)}
+                      <button type="button" class="tp-chip-remove" data-item-id="${item.id}" data-pick-field="${item.field}" aria-label="Remove ${item.name}">&times;</button>
+                    </span>
+                  `
+                )
+                .join("")}
             </div>
           </div>
         `
       )
       .join("");
+
+    resultEl.querySelectorAll(".tp-chip-remove").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        removeTodayPlanPick(btn.dataset.itemId, btn.dataset.pickField);
+      });
+    });
   }
 
   const loadingP = content.querySelector(".tp-empty");
   if (loadingP) loadingP.replaceWith(resultEl);
+}
+
+// Lets you tap a chip in Today's Plan to mark it done (e.g. rode it
+// already) without opening the day modal. Operates on whichever day is
+// "today" directly, since the modal isn't necessarily open here.
+function removeTodayPlanPick(itemId, field) {
+  const todayIso = isoDate(new Date());
+  const day = tripDays.find((d) => d.date === todayIso);
+  if (!day) return;
+
+  day[field] = day[field].filter((p) => p.id !== itemId);
+  saveTripDays();
+  renderDaysList();
+  renderTodayPlan();
 }
 
 function bindTodayPlanOpenButtons() {
