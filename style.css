@@ -706,7 +706,6 @@ main {
   flex: 1 1 220px;
 }
 
-.itin-period,
 .itin-time {
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -714,10 +713,9 @@ main {
   font-size: 0.82rem;
   background: white;
   color: var(--text);
+  flex: 1 1 auto;
+  min-width: 0;
 }
-
-.itin-period { flex: 0 0 auto; }
-.itin-time { flex: 1 1 auto; min-width: 0; }
 
 .itin-show-time {
   font-size: 0.82rem;

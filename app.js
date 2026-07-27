@@ -14,11 +14,12 @@ const PARKS = [
   { id: "ead53ea5-22e5-4095-9a83-8c29300d7c63", name: "Blizzard Beach", emoji: "❄️" },
 ];
 
-const PERIOD_SECTIONS = [
-  { id: "morning", label: "🌅 Morning" },
-  { id: "afternoon", label: "☀️ Afternoon" },
-  { id: "evening", label: "🌆 Evening" },
-  { id: "", label: "📋 Unscheduled" },
+// Shared by the itinerary editor and Today's Plan — both group picks by
+// type (rides -> shows -> dining) rather than time-of-day.
+const TYPE_SECTIONS = [
+  { id: "attraction", label: "🎢 Rides & Attractions" },
+  { id: "show", label: "🎆 Shows, Parades & Fireworks" },
+  { id: "restaurant", label: "🍽️ Restaurants" },
 ];
 
 const STORAGE_KEY = "disneyTripDays";
@@ -62,9 +63,7 @@ let activeLiveDataByPark = {}; // parkId -> Map(attractionId -> { status, waitTi
 // ---------- Persistence ----------
 
 function normalizePicks(picks) {
-  return (picks || []).map((p) =>
-    typeof p === "string" ? { id: p, period: "", time: "", lightningLane: false } : p
-  );
+  return (picks || []).map((p) => (typeof p === "string" ? { id: p, time: "", lightningLane: false } : p));
 }
 
 function loadTripDays() {
@@ -181,23 +180,6 @@ function parkById(parkId) {
 function sortDays() {
   tripDays.sort((a, b) => a.date.localeCompare(b.date));
 }
-
-function groupPicksByPeriod(picks) {
-  const groups = { morning: [], afternoon: [], evening: [], "": [] };
-  for (const p of picks) {
-    (groups[p.period] || groups[""]).push(p);
-  }
-  return groups;
-}
-
-// Today's Plan groups by type instead of period (rides -> shows -> dining),
-// since "what am I doing" reads more naturally by category on a quick glance
-// than by time-of-day for a single day.
-const TODAY_PLAN_TYPE_SECTIONS = [
-  { id: "attraction", label: "🎢 Rides & Attractions" },
-  { id: "show", label: "🎆 Shows, Parades & Fireworks" },
-  { id: "restaurant", label: "🍽️ Restaurants" },
-];
 
 function groupPicksByKind(picks) {
   const groups = { attraction: [], show: [], restaurant: [] };
@@ -722,17 +704,6 @@ function formatShowTimesText(live) {
   return live.showtimes.map((s) => formatShowTime(s.startTime)).join(" · ");
 }
 
-// Showtimes are real (unlike rides/dining, there's no user-entered time to
-// wait for), so the period is derived from the first performance instead of
-// asking the user to pick one.
-function deriveShowPeriod(live) {
-  if (!live || !live.showtimes || live.showtimes.length === 0) return "";
-  const hour = new Date(live.showtimes[0].startTime).getHours();
-  if (hour < 12) return "morning";
-  if (hour < 17) return "afternoon";
-  return "evening";
-}
-
 function buildShowSubtitle(live) {
   if (!live) return "";
 
@@ -887,7 +858,7 @@ function handlePickToggle(e) {
 
   if (e.target.checked) {
     if (!day[field].some((p) => p.id === itemId)) {
-      day[field].push({ id: itemId, period: "", time: "", lightningLane: false });
+      day[field].push({ id: itemId, time: "", lightningLane: false });
     }
     li.classList.add("picked");
   } else {
@@ -934,7 +905,6 @@ function collectDayPicks(day) {
           field: "showPicks",
           emoji: "🎆",
           kind: "show",
-          period: deriveShowPeriod(live),
           showTimesText: formatShowTimesText(live),
         });
       }
@@ -958,9 +928,9 @@ function renderItinerary() {
   }
 
   wrapEl.classList.remove("hidden");
-  const groups = groupPicksByPeriod(picks);
+  const groups = groupPicksByKind(picks);
 
-  sectionsEl.innerHTML = PERIOD_SECTIONS.filter((s) => groups[s.id].length > 0)
+  sectionsEl.innerHTML = TYPE_SECTIONS.filter((s) => groups[s.id].length > 0)
     .map(
       (s) => `
         <div class="itin-section">
@@ -976,51 +946,30 @@ function renderItinerary() {
   bindItineraryRowEvents();
 }
 
-const ITIN_TIME_PLACEHOLDERS = {
-  attraction: "Return time",
-  restaurant: "Reservation time",
-};
-
 function renderItinRow(item) {
-  if (item.kind === "show") {
-    // Showtimes are real API data, not something the user enters — read-only,
-    // and grouped into Morning/Afternoon/Evening automatically (see
-    // deriveShowPeriod), so there's no dropdown or text field to edit here.
-    return `
-      <div class="itin-row" data-item-id="${item.id}" data-pick-field="${item.field}">
-        <button type="button" class="remove-pick" data-item-id="${item.id}" data-pick-field="${item.field}" aria-label="Remove ${item.name}">&times;</button>
-        <div class="itin-row-main">
-          <span>${item.emoji} <span class="itin-name">${item.name}</span></span>
-        </div>
-        <div class="itin-row-controls">
-          <span class="itin-show-time" title="Reflects today's schedule — check My Disney Experience closer to your date">🕐 ${item.showTimesText}</span>
-        </div>
-      </div>
-    `;
-  }
+  // Each type shows only the control that's actually meaningful for it:
+  // rides get a Lightning Lane flag (no time — nothing to schedule),
+  // restaurants get a time field (no scheduling dropdown), shows get their
+  // real showtime read-only (no controls at all).
+  let controls = "";
+  let mainExtra = "";
 
-  const timePlaceholder = ITIN_TIME_PLACEHOLDERS[item.kind] || "Time";
-  const llToggle =
-    item.kind === "attraction"
-      ? `<label class="itin-ll"><input type="checkbox" class="itin-ll-input" ${item.lightningLane ? "checked" : ""}> ⚡ LL</label>`
-      : "";
+  if (item.kind === "attraction") {
+    mainExtra = `<label class="itin-ll"><input type="checkbox" class="itin-ll-input" ${item.lightningLane ? "checked" : ""}> ⚡ LL</label>`;
+  } else if (item.kind === "restaurant") {
+    controls = `<input type="text" class="itin-time" placeholder="Reservation time">`;
+  } else if (item.kind === "show") {
+    controls = `<span class="itin-show-time" title="Reflects today's schedule — check My Disney Experience closer to your date">🕐 ${item.showTimesText}</span>`;
+  }
 
   return `
     <div class="itin-row" data-item-id="${item.id}" data-pick-field="${item.field}">
       <button type="button" class="remove-pick" data-item-id="${item.id}" data-pick-field="${item.field}" aria-label="Remove ${item.name}">&times;</button>
       <div class="itin-row-main">
         <span>${item.emoji} <span class="itin-name">${item.name}</span></span>
-        ${llToggle}
+        ${mainExtra}
       </div>
-      <div class="itin-row-controls">
-        <select class="itin-period">
-          <option value="" ${!item.period ? "selected" : ""}>Unscheduled</option>
-          <option value="morning" ${item.period === "morning" ? "selected" : ""}>🌅 Morning</option>
-          <option value="afternoon" ${item.period === "afternoon" ? "selected" : ""}>☀️ Afternoon</option>
-          <option value="evening" ${item.period === "evening" ? "selected" : ""}>🌆 Evening</option>
-        </select>
-        <input type="text" class="itin-time" placeholder="${timePlaceholder}">
-      </div>
+      ${controls ? `<div class="itin-row-controls">${controls}</div>` : ""}
     </div>
   `;
 }
@@ -1042,14 +991,6 @@ function bindItineraryRowEvents() {
       timeInput.value = pick.time || "";
       timeInput.addEventListener("change", () => {
         updatePick(itemId, field, { time: timeInput.value });
-      });
-    }
-
-    const periodSelect = row.querySelector(".itin-period");
-    if (periodSelect) {
-      periodSelect.addEventListener("change", () => {
-        updatePick(itemId, field, { period: periodSelect.value });
-        renderItinerary(); // moves the row to a different section
       });
     }
 
@@ -1175,7 +1116,7 @@ async function renderTodayPlan() {
   } else {
     const groups = groupPicksByKind(picks);
     resultEl.className = "tp-itinerary";
-    resultEl.innerHTML = TODAY_PLAN_TYPE_SECTIONS.filter((s) => groups[s.id].length > 0)
+    resultEl.innerHTML = TYPE_SECTIONS.filter((s) => groups[s.id].length > 0)
       .map(
         (s) => `
           <div class="tp-period-group">
