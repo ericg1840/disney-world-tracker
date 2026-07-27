@@ -14,7 +14,15 @@ const PARKS = [
   { id: "ead53ea5-22e5-4095-9a83-8c29300d7c63", name: "Blizzard Beach", emoji: "❄️" },
 ];
 
+const PERIOD_SECTIONS = [
+  { id: "morning", label: "🌅 Morning" },
+  { id: "afternoon", label: "☀️ Afternoon" },
+  { id: "evening", label: "🌆 Evening" },
+  { id: "", label: "📋 Unscheduled" },
+];
+
 const STORAGE_KEY = "disneyTripDays";
+const TRIP_INFO_KEY = "disneyTripInfo";
 const PARK_CACHE_PREFIX = "disneyParkCache_";
 const PARK_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -46,11 +54,18 @@ const WEATHER_CODES = {
 // ---------- State ----------
 
 let tripDays = loadTripDays();
+let tripInfo = loadTripInfo();
 let activeDayId = null;
 let activeParkItemsByPark = {}; // parkId -> { attractions, restaurants }
 let activeLiveDataByPark = {}; // parkId -> Map(attractionId -> { status, waitTime })
 
 // ---------- Persistence ----------
+
+function normalizePicks(picks) {
+  return (picks || []).map((p) =>
+    typeof p === "string" ? { id: p, period: "", time: "", lightningLane: false } : p
+  );
+}
 
 function loadTripDays() {
   try {
@@ -60,6 +75,8 @@ function loadTripDays() {
       ...day,
       parkIds: day.parkIds || (day.parkId ? [day.parkId] : []),
       parkId: undefined,
+      attractionPicks: normalizePicks(day.attractionPicks),
+      restaurantPicks: normalizePicks(day.restaurantPicks),
     }));
   } catch (e) {
     return [];
@@ -68,6 +85,20 @@ function loadTripDays() {
 
 function saveTripDays() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tripDays));
+}
+
+function loadTripInfo() {
+  const empty = { resort: "", confirmation: "", checkIn: "", checkOut: "" };
+  try {
+    const raw = localStorage.getItem(TRIP_INFO_KEY);
+    return raw ? { ...empty, ...JSON.parse(raw) } : empty;
+  } catch (e) {
+    return empty;
+  }
+}
+
+function saveTripInfo() {
+  localStorage.setItem(TRIP_INFO_KEY, JSON.stringify(tripInfo));
 }
 
 function getParkCache(parkId) {
@@ -93,6 +124,12 @@ function setParkCache(parkId, attractions, restaurants) {
 
 function uid() {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str == null ? "" : str;
+  return div.innerHTML;
 }
 
 function parseIsoDate(dateStr) {
@@ -133,6 +170,70 @@ function parkById(parkId) {
 function sortDays() {
   tripDays.sort((a, b) => a.date.localeCompare(b.date));
 }
+
+function groupPicksByPeriod(picks) {
+  const groups = { morning: [], afternoon: [], evening: [], "": [] };
+  for (const p of picks) {
+    (groups[p.period] || groups[""]).push(p);
+  }
+  return groups;
+}
+
+// ---------- Rendering: Trip info (resort & confirmation) ----------
+
+function renderTripInfo() {
+  const content = document.getElementById("trip-info-content");
+  const hasInfo = tripInfo.resort || tripInfo.confirmation || tripInfo.checkIn || tripInfo.checkOut;
+
+  if (!hasInfo) {
+    content.innerHTML = `
+      <div class="trip-info-empty">
+        <p>🏨 Add your resort & confirmation info</p>
+        <button type="button" class="btn primary" id="edit-trip-info-btn">+ Add</button>
+      </div>
+    `;
+  } else {
+    const dateRangeStr =
+      tripInfo.checkIn && tripInfo.checkOut
+        ? `${formatDateDisplay(tripInfo.checkIn)} – ${formatDateDisplay(tripInfo.checkOut)}`
+        : "";
+    const detailParts = [];
+    if (tripInfo.confirmation) detailParts.push(`Confirmation #${escapeHtml(tripInfo.confirmation)}`);
+    if (dateRangeStr) detailParts.push(dateRangeStr);
+
+    content.innerHTML = `
+      <div class="trip-info-card">
+        <div>
+          ${tripInfo.resort ? `<div class="ti-resort">🏨 ${escapeHtml(tripInfo.resort)}</div>` : ""}
+          ${detailParts.length ? `<div class="ti-details">${detailParts.join(" · ")}</div>` : ""}
+        </div>
+        <button type="button" class="tp-link-btn" id="edit-trip-info-btn">Edit</button>
+      </div>
+    `;
+  }
+
+  document.getElementById("edit-trip-info-btn").addEventListener("click", openTripInfoModal);
+}
+
+function openTripInfoModal() {
+  document.getElementById("trip-info-resort").value = tripInfo.resort || "";
+  document.getElementById("trip-info-confirmation").value = tripInfo.confirmation || "";
+  document.getElementById("trip-info-checkin").value = tripInfo.checkIn || "";
+  document.getElementById("trip-info-checkout").value = tripInfo.checkOut || "";
+  openModal("trip-info-modal");
+}
+
+document.getElementById("save-trip-info-btn").addEventListener("click", () => {
+  tripInfo = {
+    resort: document.getElementById("trip-info-resort").value.trim(),
+    confirmation: document.getElementById("trip-info-confirmation").value.trim(),
+    checkIn: document.getElementById("trip-info-checkin").value,
+    checkOut: document.getElementById("trip-info-checkout").value,
+  };
+  saveTripInfo();
+  closeModal("trip-info-modal");
+  renderTripInfo();
+});
 
 // ---------- Rendering: Days list ----------
 
@@ -441,8 +542,8 @@ function togglePark(parkId) {
         ...items.attractions.map((a) => a.id),
         ...items.restaurants.map((r) => r.id),
       ]);
-      day.attractionPicks = day.attractionPicks.filter((id) => !removeIds.has(id));
-      day.restaurantPicks = day.restaurantPicks.filter((id) => !removeIds.has(id));
+      day.attractionPicks = day.attractionPicks.filter((p) => !removeIds.has(p.id));
+      day.restaurantPicks = day.restaurantPicks.filter((p) => !removeIds.has(p.id));
     }
   }
 
@@ -557,7 +658,7 @@ async function renderParkSectionsForDay(day) {
     emptyHint.classList.remove("hidden");
     filterInput.classList.add("hidden");
     refreshBtn.classList.add("hidden");
-    renderPlannedSummary();
+    renderItinerary();
     return;
   }
 
@@ -588,7 +689,7 @@ async function renderParkSectionsForDay(day) {
 
   await Promise.all(day.parkIds.map((parkId) => loadAndRenderParkSection(parkId)));
 
-  renderPlannedSummary();
+  renderItinerary();
   applyFilter(filterInput.value);
 }
 
@@ -628,69 +729,6 @@ async function loadAndRenderParkSection(parkId) {
   stillCurrent.querySelector('[data-count="restaurants"]').textContent = `(${restaurants.length})`;
 }
 
-function renderPlannedSummary() {
-  const day = tripDays.find((d) => d.id === activeDayId);
-  const summaryEl = document.getElementById("planned-summary");
-  const listEl = document.getElementById("planned-list");
-  if (!day) return;
-
-  const picks = [];
-  for (const parkId of day.parkIds) {
-    const items = activeParkItemsByPark[parkId];
-    if (!items) continue;
-    for (const item of items.attractions) {
-      if (day.attractionPicks.includes(item.id)) picks.push({ ...item, field: "attractionPicks", emoji: "🎢" });
-    }
-    for (const item of items.restaurants) {
-      if (day.restaurantPicks.includes(item.id)) picks.push({ ...item, field: "restaurantPicks", emoji: "🍽️" });
-    }
-  }
-
-  if (picks.length === 0) {
-    summaryEl.classList.add("hidden");
-    listEl.innerHTML = "";
-    return;
-  }
-
-  summaryEl.classList.remove("hidden");
-  listEl.innerHTML = picks
-    .map(
-      (item) => `
-        <li>
-          <span>${item.emoji} ${item.name}</span>
-          <button type="button" class="remove-pick" data-item-id="${item.id}" data-pick-field="${item.field}" aria-label="Remove ${item.name}">&times;</button>
-        </li>
-      `
-    )
-    .join("");
-
-  listEl.querySelectorAll(".remove-pick").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      removePick(btn.dataset.itemId, btn.dataset.pickField);
-    });
-  });
-}
-
-function removePick(itemId, field) {
-  const day = tripDays.find((d) => d.id === activeDayId);
-  if (!day) return;
-
-  day[field] = day[field].filter((id) => id !== itemId);
-  saveTripDays();
-
-  const checkbox = document.querySelector(
-    `#park-sections input[data-item-id="${itemId}"][data-pick-field="${field}"]`
-  );
-  if (checkbox) {
-    checkbox.checked = false;
-    checkbox.closest("li").classList.remove("picked");
-  }
-
-  renderPlannedSummary();
-  renderDaysList();
-  renderTodayPlan();
-}
-
 function renderItemList(listEl, items, pickField, liveMap) {
   const day = tripDays.find((d) => d.id === activeDayId);
   listEl.innerHTML = "";
@@ -701,7 +739,7 @@ function renderItemList(listEl, items, pickField, liveMap) {
   }
 
   for (const item of items) {
-    const isPicked = day[pickField].includes(item.id);
+    const isPicked = day[pickField].some((p) => p.id === item.id);
     const li = document.createElement("li");
     li.dataset.itemName = item.name.toLowerCase();
     if (isPicked) li.classList.add("picked");
@@ -732,15 +770,17 @@ function handlePickToggle(e) {
   const li = e.target.closest("li");
 
   if (e.target.checked) {
-    if (!day[field].includes(itemId)) day[field].push(itemId);
+    if (!day[field].some((p) => p.id === itemId)) {
+      day[field].push({ id: itemId, period: "", time: "", lightningLane: false });
+    }
     li.classList.add("picked");
   } else {
-    day[field] = day[field].filter((id) => id !== itemId);
+    day[field] = day[field].filter((p) => p.id !== itemId);
     li.classList.remove("picked");
   }
 
   saveTripDays();
-  renderPlannedSummary();
+  renderItinerary();
   renderDaysList();
   renderTodayPlan();
 }
@@ -751,6 +791,150 @@ function applyFilter(query) {
     if (!li.dataset.itemName) return;
     li.style.display = li.dataset.itemName.includes(q) ? "" : "none";
   });
+}
+
+// ---------- Itinerary (editable: period, time, Lightning Lane) ----------
+
+function collectDayPicks(day) {
+  const picks = [];
+  for (const parkId of day.parkIds) {
+    const items = activeParkItemsByPark[parkId];
+    if (!items) continue;
+    for (const item of items.attractions) {
+      const pick = day.attractionPicks.find((p) => p.id === item.id);
+      if (pick) picks.push({ ...item, ...pick, field: "attractionPicks", emoji: "🎢", isAttraction: true });
+    }
+    for (const item of items.restaurants) {
+      const pick = day.restaurantPicks.find((p) => p.id === item.id);
+      if (pick) picks.push({ ...item, ...pick, field: "restaurantPicks", emoji: "🍽️", isAttraction: false });
+    }
+  }
+  return picks;
+}
+
+function renderItinerary() {
+  const day = tripDays.find((d) => d.id === activeDayId);
+  const wrapEl = document.getElementById("itinerary");
+  const sectionsEl = document.getElementById("itinerary-sections");
+  if (!day) return;
+
+  const picks = collectDayPicks(day);
+
+  if (picks.length === 0) {
+    wrapEl.classList.add("hidden");
+    sectionsEl.innerHTML = "";
+    return;
+  }
+
+  wrapEl.classList.remove("hidden");
+  const groups = groupPicksByPeriod(picks);
+
+  sectionsEl.innerHTML = PERIOD_SECTIONS.filter((s) => groups[s.id].length > 0)
+    .map(
+      (s) => `
+        <div class="itin-section">
+          <h5 class="itin-section-title">${s.label}</h5>
+          <div class="itin-rows">
+            ${groups[s.id].map(renderItinRow).join("")}
+          </div>
+        </div>
+      `
+    )
+    .join("");
+
+  bindItineraryRowEvents();
+}
+
+function renderItinRow(item) {
+  const timePlaceholder = item.isAttraction ? "Return time" : "Reservation time";
+  const llToggle = item.isAttraction
+    ? `<label class="itin-ll"><input type="checkbox" class="itin-ll-input" ${item.lightningLane ? "checked" : ""}> ⚡ LL</label>`
+    : "";
+
+  return `
+    <div class="itin-row" data-item-id="${item.id}" data-pick-field="${item.field}">
+      <button type="button" class="remove-pick" data-item-id="${item.id}" data-pick-field="${item.field}" aria-label="Remove ${item.name}">&times;</button>
+      <div class="itin-row-main">
+        <span>${item.emoji} <span class="itin-name">${item.name}</span></span>
+        ${llToggle}
+      </div>
+      <div class="itin-row-controls">
+        <select class="itin-period">
+          <option value="" ${!item.period ? "selected" : ""}>Unscheduled</option>
+          <option value="morning" ${item.period === "morning" ? "selected" : ""}>🌅 Morning</option>
+          <option value="afternoon" ${item.period === "afternoon" ? "selected" : ""}>☀️ Afternoon</option>
+          <option value="evening" ${item.period === "evening" ? "selected" : ""}>🌆 Evening</option>
+        </select>
+        <input type="text" class="itin-time" placeholder="${timePlaceholder}">
+      </div>
+    </div>
+  `;
+}
+
+function bindItineraryRowEvents() {
+  const day = tripDays.find((d) => d.id === activeDayId);
+  if (!day) return;
+
+  document.querySelectorAll("#itinerary-sections .itin-row").forEach((row) => {
+    const itemId = row.dataset.itemId;
+    const field = row.dataset.pickField;
+    const pick = day[field].find((p) => p.id === itemId);
+    if (!pick) return;
+
+    const timeInput = row.querySelector(".itin-time");
+    // Set via property, not a template attribute, so quotes/special chars in
+    // user-typed times can't break the surrounding markup.
+    timeInput.value = pick.time || "";
+    timeInput.addEventListener("change", () => {
+      updatePick(itemId, field, { time: timeInput.value });
+    });
+
+    const periodSelect = row.querySelector(".itin-period");
+    periodSelect.addEventListener("change", () => {
+      updatePick(itemId, field, { period: periodSelect.value });
+      renderItinerary(); // moves the row to a different section
+    });
+
+    const llInput = row.querySelector(".itin-ll-input");
+    if (llInput) {
+      llInput.addEventListener("change", () => {
+        updatePick(itemId, field, { lightningLane: llInput.checked });
+      });
+    }
+
+    row.querySelector(".remove-pick").addEventListener("click", () => removePick(itemId, field));
+  });
+}
+
+function updatePick(itemId, field, changes) {
+  const day = tripDays.find((d) => d.id === activeDayId);
+  if (!day) return;
+  const pick = day[field].find((p) => p.id === itemId);
+  if (!pick) return;
+  Object.assign(pick, changes);
+  saveTripDays();
+  renderDaysList();
+  renderTodayPlan();
+}
+
+function removePick(itemId, field) {
+  const day = tripDays.find((d) => d.id === activeDayId);
+  if (!day) return;
+
+  day[field] = day[field].filter((p) => p.id !== itemId);
+  saveTripDays();
+
+  const checkbox = document.querySelector(
+    `#park-sections input[data-item-id="${itemId}"][data-pick-field="${field}"]`
+  );
+  if (checkbox) {
+    checkbox.checked = false;
+    checkbox.closest("li").classList.remove("picked");
+  }
+
+  renderItinerary();
+  renderDaysList();
+  renderTodayPlan();
 }
 
 // ---------- Rendering: Today's Plan ----------
@@ -793,10 +977,12 @@ async function renderTodayPlan() {
     for (const parkId of day.parkIds) {
       const { attractions, restaurants } = await fetchParkItems(parkId);
       for (const item of attractions) {
-        if (day.attractionPicks.includes(item.id)) picks.push({ ...item, emoji: "🎢" });
+        const pick = day.attractionPicks.find((p) => p.id === item.id);
+        if (pick) picks.push({ ...item, ...pick, emoji: "🎢", isAttraction: true });
       }
       for (const item of restaurants) {
-        if (day.restaurantPicks.includes(item.id)) picks.push({ ...item, emoji: "🍽️" });
+        const pick = day.restaurantPicks.find((p) => p.id === item.id);
+        if (pick) picks.push({ ...item, ...pick, emoji: "🍽️", isAttraction: false });
       }
     }
   } catch (e) {
@@ -805,16 +991,34 @@ async function renderTodayPlan() {
     return;
   }
 
-  const groupsEl = document.createElement("div");
+  const resultEl = document.createElement("div");
   if (picks.length === 0) {
-    groupsEl.innerHTML = '<p class="tp-empty">Nothing planned yet — tap "View & edit" to add rides or restaurants.</p>';
+    resultEl.innerHTML = '<p class="tp-empty">Nothing planned yet — tap "View & edit" to add rides or restaurants.</p>';
   } else {
-    groupsEl.className = "tp-groups";
-    groupsEl.innerHTML = picks.map((item) => `<span class="tp-chip">${item.emoji} ${item.name}</span>`).join("");
+    const groups = groupPicksByPeriod(picks);
+    resultEl.className = "tp-itinerary";
+    resultEl.innerHTML = PERIOD_SECTIONS.filter((s) => groups[s.id].length > 0)
+      .map(
+        (s) => `
+          <div class="tp-period-group">
+            <div class="tp-period-label">${s.label}</div>
+            <div class="tp-groups">
+              ${groups[s.id]
+                .map((item) => {
+                  const timeStr = item.time ? ` · ${escapeHtml(item.time)}` : "";
+                  const llStr = item.lightningLane ? " ⚡" : "";
+                  return `<span class="tp-chip">${item.emoji} ${item.name}${timeStr}${llStr}</span>`;
+                })
+                .join("")}
+            </div>
+          </div>
+        `
+      )
+      .join("");
   }
 
   const loadingP = content.querySelector(".tp-empty");
-  if (loadingP) loadingP.replaceWith(groupsEl);
+  if (loadingP) loadingP.replaceWith(resultEl);
 }
 
 function bindTodayPlanOpenButtons() {
@@ -827,6 +1031,7 @@ function bindTodayPlanOpenButtons() {
 
 function init() {
   sortDays();
+  renderTripInfo();
   renderDaysList();
   renderWeatherStrip();
   renderTodayPlan();

@@ -224,6 +224,25 @@ main {
   color: var(--purple-dark);
 }
 
+.tp-itinerary {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tp-period-group + .tp-period-group { margin-top: 0; }
+
+.tp-period-label {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.74rem;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--purple-dark);
+  opacity: 0.7;
+  margin-bottom: 5px;
+}
+
 .tp-groups {
   display: flex;
   flex-wrap: wrap;
@@ -569,47 +588,112 @@ main {
 
 #refresh-wait-times-btn.hidden { display: none; }
 
-/* ---------- Planned summary ---------- */
+/* ---------- Itinerary (editable, in the day detail modal) ---------- */
 
-.planned-summary {
+.itinerary {
   background: #e4f6f8;
   border: 1px solid #c8ecf0;
   border-radius: var(--radius-sm);
-  padding: 11px 14px;
+  padding: 12px 14px;
   margin-bottom: 14px;
 }
 
-.planned-summary.hidden { display: none; }
+.itinerary.hidden { display: none; }
 
-.planned-summary h4 {
-  margin: 0 0 8px;
-  font-size: 0.86rem;
+.itinerary h4 {
+  margin: 0 0 10px;
+  font-size: 0.88rem;
   color: var(--accent-park);
 }
 
-.planned-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+.itinerary-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.itin-section-title {
+  margin: 0 0 6px;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--purple-dark);
+  opacity: 0.75;
+}
+
+.itin-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.itin-row {
+  position: relative;
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
-}
-
-.planned-list li {
-  display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
   background: white;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 4px 6px 4px 12px;
-  font-size: 0.84rem;
+  border-radius: var(--radius-sm);
+  padding: 8px 40px 8px 10px;
 }
 
-.planned-list .remove-pick {
-  width: 24px;
-  height: 24px;
+.itin-row-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.itin-name {
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.itin-ll {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--gold-deep);
+  cursor: pointer;
+  white-space: nowrap;
+  margin-left: 2px;
+}
+
+.itin-ll input { accent-color: var(--gold-deep); }
+
+.itin-row-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 220px;
+}
+
+.itin-period,
+.itin-time {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 0.82rem;
+  background: white;
+  color: var(--text);
+}
+
+.itin-period { flex: 0 0 auto; }
+.itin-time { flex: 1 1 auto; min-width: 0; }
+
+.itin-row .remove-pick {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -618,13 +702,65 @@ main {
   border-radius: 50%;
   color: var(--muted);
   cursor: pointer;
-  font-size: 1rem;
+  font-size: 1.1rem;
   line-height: 1;
 }
 
-.planned-list .remove-pick:hover {
+.itin-row .remove-pick:hover {
   background: #fdecea;
   color: var(--danger);
+}
+
+@media (max-width: 480px) {
+  .itin-row-controls { flex-wrap: wrap; }
+  .itin-time { flex-basis: 100%; }
+}
+
+/* ---------- Trip info (resort & confirmation) ---------- */
+
+.trip-info-section { margin-bottom: 18px; }
+
+.trip-info-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--purple);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.trip-info-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--card-bg);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+}
+
+.trip-info-empty p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.ti-resort {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  color: var(--purple-dark);
+  font-size: 0.98rem;
+}
+
+.ti-details {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin-top: 2px;
 }
 
 /* ---------- Park sections / item lists ---------- */

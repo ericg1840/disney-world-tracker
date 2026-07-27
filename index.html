@@ -21,6 +21,10 @@
 </header>
 
 <main>
+  <section id="trip-info-section" class="trip-info-section">
+    <div id="trip-info-content" class="trip-info-content"></div>
+  </section>
+
   <section id="weather-strip" class="weather-strip" aria-label="Weather forecast">
     <p class="empty-hint">Add trip days below to see the forecast.</p>
   </section>
@@ -40,6 +44,32 @@
     </div>
   </section>
 </main>
+
+<!-- Trip Info Modal -->
+<div id="trip-info-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Resort & Confirmation</h3>
+      <button class="icon-btn close-modal" data-close="trip-info-modal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <label for="trip-info-resort">Resort</label>
+      <input type="text" id="trip-info-resort" placeholder="e.g. Disney's Polynesian Village Resort">
+
+      <label for="trip-info-confirmation">Confirmation number</label>
+      <input type="text" id="trip-info-confirmation" placeholder="e.g. 1234567890">
+
+      <label for="trip-info-checkin">Check-in date</label>
+      <input type="date" id="trip-info-checkin">
+
+      <label for="trip-info-checkout">Check-out date</label>
+      <input type="date" id="trip-info-checkout">
+    </div>
+    <div class="modal-footer">
+      <button class="btn primary" id="save-trip-info-btn">Save</button>
+    </div>
+  </div>
+</div>
 
 <!-- Add Day Modal -->
 <div id="add-day-modal" class="modal-overlay hidden">
@@ -74,9 +104,9 @@
 
       <button type="button" id="refresh-wait-times-btn" class="tp-link-btn hidden">🔄 Refresh wait times</button>
 
-      <div id="planned-summary" class="planned-summary hidden">
-        <h4>✅ Planned for this day</h4>
-        <ul id="planned-list" class="planned-list"></ul>
+      <div id="itinerary" class="itinerary hidden">
+        <h4>🗓️ Your itinerary</h4>
+        <div id="itinerary-sections" class="itinerary-sections"></div>
       </div>
 
       <input type="text" id="filter-input" class="filter-input hidden" placeholder="Filter rides & restaurants…">
