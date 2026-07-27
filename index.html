@@ -14,12 +14,13 @@
 
 <header class="app-header">
   <div class="header-stars" aria-hidden="true"></div>
-  <h1><span class="header-sparkle">✨</span> Disney World Trip Tracker <span class="header-sparkle">✨</span></h1>
+  <div class="header-inner">
+    <h1>Disney World Trip Tracker</h1>
+    <p id="countdown-banner" class="countdown hidden"></p>
+  </div>
 </header>
 
 <main>
-  <section id="countdown-banner" class="countdown-banner hidden"></section>
-
   <section id="weather-strip" class="weather-strip" aria-label="Weather forecast">
     <p class="empty-hint">Add trip days below to see the forecast.</p>
   </section>
@@ -31,7 +32,7 @@
 
   <section class="days-section">
     <div class="days-header">
-      <h2>Your Trip Days</h2>
+      <h2 class="section-heading">Your Trip Days</h2>
       <button id="add-day-btn" class="btn primary">+ Add Day</button>
     </div>
     <div id="days-list" class="days-list">

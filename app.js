@@ -3,13 +3,15 @@
 const WDW_LAT = 28.3852;
 const WDW_LON = -81.5639;
 
+// `name` is the short label shown in the UI — the full names ("Disney's
+// Hollywood Studios") are too wide for chips and toggles on a phone.
 const PARKS = [
   { id: "75ea578a-adc8-4116-a54d-dccb60765ef9", name: "Magic Kingdom", emoji: "🏰" },
   { id: "47f90d2c-e191-4239-a466-5892ef59a88b", name: "EPCOT", emoji: "🌐" },
-  { id: "288747d1-8b4f-4a64-867e-ea7c9b27bad8", name: "Disney's Hollywood Studios", emoji: "🎬" },
-  { id: "1c84a229-8862-4648-9c71-378ddd2c7693", name: "Disney's Animal Kingdom", emoji: "🌴" },
-  { id: "b070cbc5-feaa-4b87-a8c1-f94cca037a18", name: "Typhoon Lagoon Water Park", emoji: "🌊" },
-  { id: "ead53ea5-22e5-4095-9a83-8c29300d7c63", name: "Blizzard Beach Water Park", emoji: "❄️" },
+  { id: "288747d1-8b4f-4a64-867e-ea7c9b27bad8", name: "Hollywood Studios", emoji: "🎬" },
+  { id: "1c84a229-8862-4648-9c71-378ddd2c7693", name: "Animal Kingdom", emoji: "🌴" },
+  { id: "b070cbc5-feaa-4b87-a8c1-f94cca037a18", name: "Typhoon Lagoon", emoji: "🌊" },
+  { id: "ead53ea5-22e5-4095-9a83-8c29300d7c63", name: "Blizzard Beach", emoji: "❄️" },
 ];
 
 const STORAGE_KEY = "disneyTripDays";
@@ -110,6 +112,14 @@ function formatWeekday(dateStr) {
   return parseIsoDate(dateStr).toLocaleDateString(undefined, { weekday: "long" });
 }
 
+function formatWeekdayShort(dateStr) {
+  return parseIsoDate(dateStr).toLocaleDateString(undefined, { weekday: "short" });
+}
+
+function formatMonthDay(dateStr) {
+  return parseIsoDate(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 function daysBetween(aIso, bIso) {
   const a = parseIsoDate(aIso);
   const b = parseIsoDate(bIso);
@@ -133,10 +143,13 @@ function renderDaysList() {
     return;
   }
 
+  const todayIso = isoDate(new Date());
+
   container.innerHTML = "";
   for (const day of tripDays) {
+    const isToday = day.date === todayIso;
     const card = document.createElement("div");
-    card.className = "day-card";
+    card.className = isToday ? "day-card is-today" : "day-card";
     card.dataset.dayId = day.id;
 
     const parks = day.parkIds.map(parkById).filter(Boolean);
@@ -151,8 +164,11 @@ function renderDaysList() {
 
     card.innerHTML = `
       <button type="button" class="day-card-delete" aria-label="Delete ${formatDateDisplay(day.date)}">&times;</button>
-      <div class="dc-date">${formatDateDisplay(day.date)}</div>
-      <div class="dc-weekday">${formatWeekday(day.date)}</div>
+      <div class="dc-head">
+        <span class="dc-date">${formatMonthDay(day.date)}</span>
+        <span class="dc-weekday">${formatWeekday(day.date)}</span>
+        ${isToday ? '<span class="dc-today-tag">Today</span>' : ""}
+      </div>
       <div class="dc-parks">${parksHtml}</div>
       ${pickCount > 0 ? `<div class="dc-picks">${pickCount} item${pickCount === 1 ? "" : "s"} planned</div>` : ""}
     `;
@@ -202,13 +218,13 @@ function renderCountdownBanner() {
 
   if (todayIso < firstDate) {
     const daysUntil = daysBetween(todayIso, firstDate);
-    banner.innerHTML = `🎉 <span class="cb-number">${daysUntil}</span> day${daysUntil === 1 ? "" : "s"} until your Disney trip!`;
+    banner.innerHTML = `🎉 <span class="cb-number">${daysUntil}</span> day${daysUntil === 1 ? "" : "s"} to go`;
   } else if (todayIso <= lastDate) {
     const totalDays = daysBetween(firstDate, lastDate) + 1;
     const dayNumber = daysBetween(firstDate, todayIso) + 1;
-    banner.innerHTML = `✨ You're on <span class="cb-number">day ${dayNumber}</span> of ${totalDays} of your trip!`;
+    banner.innerHTML = `✨ Day <span class="cb-number">${dayNumber}</span> of ${totalDays}`;
   } else {
-    banner.innerHTML = `🎆 Hope you had a magical trip!`;
+    banner.innerHTML = `🎆 Hope it was magical!`;
   }
 }
 
@@ -225,13 +241,18 @@ async function renderWeatherStrip() {
   const sorted = [...tripDays].sort((a, b) => a.date.localeCompare(b.date));
   const startDate = sorted[0].date;
   const endDate = sorted[sorted.length - 1].date;
+  const todayIso = isoDate(new Date());
+
+  const cardHeader = (day) => `
+    <div class="wc-day">${day.date === todayIso ? "Today" : formatWeekdayShort(day.date)}</div>
+    <div class="wc-date">${formatMonthDay(day.date)}</div>
+  `;
 
   container.innerHTML = sorted
     .map((day) => `
-      <div class="weather-card" data-weather-date="${day.date}">
-        <div class="wc-date">${formatDateDisplay(day.date)}</div>
+      <div class="weather-card ${day.date === todayIso ? "is-today" : ""}" data-weather-date="${day.date}">
+        ${cardHeader(day)}
         <div class="wc-icon">⏳</div>
-        <div class="wc-na">Loading…</div>
       </div>
     `)
     .join("");
@@ -254,15 +275,15 @@ async function renderWeatherStrip() {
       const hi = Math.round(forecast.tempMax[idx]);
       const lo = Math.round(forecast.tempMin[idx]);
       card.innerHTML = `
-        <div class="wc-date">${formatDateDisplay(day.date)}</div>
+        ${cardHeader(day)}
         <div class="wc-icon">${icon}</div>
         <div class="wc-temps"><span class="hi">${hi}°</span> / <span class="lo">${lo}°</span></div>
       `;
     } else {
       card.innerHTML = `
-        <div class="wc-date">${formatDateDisplay(day.date)}</div>
+        ${cardHeader(day)}
         <div class="wc-icon">📅</div>
-        <div class="wc-na">Forecast not yet available</div>
+        <div class="wc-na">No forecast yet</div>
       `;
     }
   }
