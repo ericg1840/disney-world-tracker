@@ -1558,6 +1558,37 @@ function bindTodayPlanOpenButtons() {
 
 // ---------- Init ----------
 
+const WALT_QUOTES = [
+  "All our dreams can come true, if we have the courage to pursue them.",
+  "It's kind of fun to do the impossible.",
+  "The way to get started is to quit talking and begin doing.",
+  "If you can dream it, you can do it.",
+  "Around here, however, we don't look backwards for very long. We keep moving forward, opening up new doors and doing new things, because we're curious… and curiosity keeps leading us down new paths.",
+  "I always like to look on the optimistic side of life.",
+  "Laughter is timeless. Imagination has no age. And dreams are forever.",
+  "When you believe in a thing, believe in it all the way, implicitly and unquestionable.",
+  "Times and conditions change so rapidly that we must keep our aim constantly focused on the future.",
+  "First, think. Second, believe. Third, dream. And finally, dare.",
+  "The more you like yourself, the less you are like anyone else, which makes you unique.",
+  "You can design and create, and build the most wonderful place in the world. But it takes people to make the dream a reality.",
+  "Get a good idea and stay with it. Dog it, and work at it until it's done right.",
+  "Of all of our inventions for mass communication, pictures still speak the most universally understood language.",
+  "A person should set his goals as early as he can and devote all his energy and talent to getting there.",
+  "Disneyland will never be completed. It will continue to grow as long as there is imagination left in the world.",
+];
+
+function renderWaltQuote() {
+  const el = document.getElementById("walt-quote");
+  if (!el) return;
+  const todayIso = isoDate(new Date());
+  let hash = 0;
+  for (let i = 0; i < todayIso.length; i++) {
+    hash = (hash * 31 + todayIso.charCodeAt(i)) >>> 0;
+  }
+  const quote = WALT_QUOTES[hash % WALT_QUOTES.length];
+  el.textContent = `"${quote}" — Walt Disney`;
+}
+
 function renderAll() {
   sortDays();
   renderTripInfo();
@@ -1570,6 +1601,7 @@ function renderAll() {
 async function init() {
   populateResortSelect();
   renderSyncSection();
+  renderWaltQuote();
   renderAll();
 
   // If sync was already set up on a previous visit, pull the latest before
