@@ -686,17 +686,36 @@ function buildWaitBadge(live) {
   return `<span class="wait-badge wait-open">Open</span>`;
 }
 
+// Plain text (no markup) — shared by the browsing-list badge, the
+// itinerary row, and Today's Plan, which each wrap it differently.
+function formatShowTimesText(live) {
+  if (!live) return "Showtime not available";
+  if (live.status === "CLOSED" || live.status === "REFURBISHMENT") return "Not scheduled today";
+  if (!live.showtimes || live.showtimes.length === 0) return "No showtime listed";
+  return live.showtimes.map((s) => formatShowTime(s.startTime)).join(" · ");
+}
+
+// Showtimes are real (unlike rides/dining, there's no user-entered time to
+// wait for), so the period is derived from the first performance instead of
+// asking the user to pick one.
+function deriveShowPeriod(live) {
+  if (!live || !live.showtimes || live.showtimes.length === 0) return "";
+  const hour = new Date(live.showtimes[0].startTime).getHours();
+  if (hour < 12) return "morning";
+  if (hour < 17) return "afternoon";
+  return "evening";
+}
+
 function buildShowSubtitle(live) {
   if (!live) return "";
 
-  if (live.status === "CLOSED" || live.status === "REFURBISHMENT") {
-    return `<span class="show-times show-times-muted">Not scheduled today</span>`;
+  const text = formatShowTimesText(live);
+  const hasTimes = Boolean(live.showtimes && live.showtimes.length > 0) && live.status !== "CLOSED" && live.status !== "REFURBISHMENT";
+
+  if (!hasTimes) {
+    return `<span class="show-times show-times-muted">${text}</span>`;
   }
-  if (!live.showtimes || live.showtimes.length === 0) {
-    return `<span class="show-times show-times-muted">No showtime listed</span>`;
-  }
-  const times = live.showtimes.map((s) => formatShowTime(s.startTime)).join(" · ");
-  return `<span class="show-times" title="Reflects today's schedule — check My Disney Experience closer to your date">🕐 ${times}</span>`;
+  return `<span class="show-times" title="Reflects today's schedule — check My Disney Experience closer to your date">🕐 ${text}</span>`;
 }
 
 async function renderParkSectionsForDay(day) {
@@ -880,7 +899,18 @@ function collectDayPicks(day) {
     }
     for (const item of items.shows) {
       const pick = day.showPicks.find((p) => p.id === item.id);
-      if (pick) picks.push({ ...item, ...pick, field: "showPicks", emoji: "🎆", kind: "show" });
+      if (pick) {
+        const live = activeLiveDataByPark[parkId] && activeLiveDataByPark[parkId].showLive.get(item.id);
+        picks.push({
+          ...item,
+          ...pick,
+          field: "showPicks",
+          emoji: "🎆",
+          kind: "show",
+          period: deriveShowPeriod(live),
+          showTimesText: formatShowTimesText(live),
+        });
+      }
     }
   }
   return picks;
@@ -922,10 +952,26 @@ function renderItinerary() {
 const ITIN_TIME_PLACEHOLDERS = {
   attraction: "Return time",
   restaurant: "Reservation time",
-  show: "Viewing time",
 };
 
 function renderItinRow(item) {
+  if (item.kind === "show") {
+    // Showtimes are real API data, not something the user enters — read-only,
+    // and grouped into Morning/Afternoon/Evening automatically (see
+    // deriveShowPeriod), so there's no dropdown or text field to edit here.
+    return `
+      <div class="itin-row" data-item-id="${item.id}" data-pick-field="${item.field}">
+        <button type="button" class="remove-pick" data-item-id="${item.id}" data-pick-field="${item.field}" aria-label="Remove ${item.name}">&times;</button>
+        <div class="itin-row-main">
+          <span>${item.emoji} <span class="itin-name">${item.name}</span></span>
+        </div>
+        <div class="itin-row-controls">
+          <span class="itin-show-time" title="Reflects today's schedule — check My Disney Experience closer to your date">🕐 ${item.showTimesText}</span>
+        </div>
+      </div>
+    `;
+  }
+
   const timePlaceholder = ITIN_TIME_PLACEHOLDERS[item.kind] || "Time";
   const llToggle =
     item.kind === "attraction"
@@ -963,18 +1009,22 @@ function bindItineraryRowEvents() {
     if (!pick) return;
 
     const timeInput = row.querySelector(".itin-time");
-    // Set via property, not a template attribute, so quotes/special chars in
-    // user-typed times can't break the surrounding markup.
-    timeInput.value = pick.time || "";
-    timeInput.addEventListener("change", () => {
-      updatePick(itemId, field, { time: timeInput.value });
-    });
+    if (timeInput) {
+      // Set via property, not a template attribute, so quotes/special chars
+      // in user-typed times can't break the surrounding markup.
+      timeInput.value = pick.time || "";
+      timeInput.addEventListener("change", () => {
+        updatePick(itemId, field, { time: timeInput.value });
+      });
+    }
 
     const periodSelect = row.querySelector(".itin-period");
-    periodSelect.addEventListener("change", () => {
-      updatePick(itemId, field, { period: periodSelect.value });
-      renderItinerary(); // moves the row to a different section
-    });
+    if (periodSelect) {
+      periodSelect.addEventListener("change", () => {
+        updatePick(itemId, field, { period: periodSelect.value });
+        renderItinerary(); // moves the row to a different section
+      });
+    }
 
     const llInput = row.querySelector(".itin-ll-input");
     if (llInput) {
@@ -1070,9 +1120,20 @@ async function renderTodayPlan() {
         const pick = day.restaurantPicks.find((p) => p.id === item.id);
         if (pick) picks.push({ ...item, ...pick, emoji: "🍽️" });
       }
-      for (const item of shows) {
-        const pick = day.showPicks.find((p) => p.id === item.id);
-        if (pick) picks.push({ ...item, ...pick, emoji: "🎆" });
+      const pickedShows = shows.filter((item) => day.showPicks.some((p) => p.id === item.id));
+      if (pickedShows.length > 0) {
+        const { showLive } = await fetchLiveData(parkId);
+        for (const item of pickedShows) {
+          const pick = day.showPicks.find((p) => p.id === item.id);
+          const live = showLive.get(item.id);
+          picks.push({
+            ...item,
+            ...pick,
+            emoji: "🎆",
+            period: deriveShowPeriod(live),
+            time: formatShowTimesText(live),
+          });
+        }
       }
     }
   } catch (e) {

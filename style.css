@@ -719,6 +719,12 @@ main {
 .itin-period { flex: 0 0 auto; }
 .itin-time { flex: 1 1 auto; min-width: 0; }
 
+.itin-show-time {
+  font-size: 0.82rem;
+  color: var(--accent-park);
+  padding: 6px 0;
+}
+
 .itin-row .remove-pick {
   position: absolute;
   top: 6px;
