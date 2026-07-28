@@ -86,11 +86,78 @@ const TYPE_SECTIONS = [
   { id: "restaurant", label: "🍽️ Restaurants" },
 ];
 
+// No API provides ride height requirements, so this is hand-maintained —
+// current as of 2026. Keyed by attraction name normalized to lowercase
+// alphanumerics, so punctuation differences (curly apostrophes, ™, colons)
+// in the source data don't break the lookup. Rides without a firm posted
+// minimum (spinners, dark rides, family raft rides) are intentionally left
+// out rather than guessed at.
+const HEIGHT_REQUIREMENTS = {
+  // Magic Kingdom
+  thebarnstormer: 35,
+  sevendwarfsminetrain: 38,
+  bigthundermountainrailroad: 40,
+  spacemountain: 44,
+  tronlightcyclerun: 48,
+  tianasbayouadventure: 40,
+  tomorrowlandspeedway: 32,
+  // EPCOT
+  testtrack: 40,
+  missionspace: 44,
+  guardiansofthegalaxycosmicrewind: 42,
+  soarinacrossamerica: 40,
+  // Hollywood Studios
+  slinkydogdash: 38,
+  starwarsriseoftheresistance: 40,
+  millenniumfalconsmugglersrun: 38,
+  thetwilightzonetowerofterror: 40,
+  rocknrollercoasterstarringthemuppets: 48,
+  alienswirlingsaucers: 32,
+  // Animal Kingdom
+  kaliriverrapids: 38,
+  avatarflightofpassage: 44,
+  expeditioneverestlegendoftheforbiddenmountain: 44,
+  // Typhoon Lagoon
+  humungakowabunga: 48,
+  crushngusher: 48,
+  // Blizzard Beach
+  summitplummet: 48,
+  slushgusher: 48,
+  downhilldoubledipper: 48,
+};
+
+function normalizeRideName(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function getHeightRequirement(name) {
+  return HEIGHT_REQUIREMENTS[normalizeRideName(name)] || null;
+}
+
+function buildHeightBadge(name) {
+  const inches = getHeightRequirement(name);
+  if (!inches) return "";
+  return `<span class="height-badge" title="Minimum height to ride — verify at the park">📏 ${inches}"</span>`;
+}
+
 const STORAGE_KEY = "disneyTripDays";
 const TRIP_INFO_KEY = "disneyTripInfo";
 const EMPTY_TRIP_INFO = { resort: "", confirmation: "", checkIn: "", checkOut: "" };
 const PARK_CACHE_PREFIX = "disneyParkCache_";
 const PARK_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const PACKING_KEY = "disneyPackingList";
+
+// Seeded in only the first time there's nothing saved yet — after that the
+// user's own list (additions, removals, checks) is authoritative.
+const DEFAULT_PACKING_ITEMS = [
+  "Park tickets / MagicBand",
+  "Phone charger & portable battery",
+  "Sunscreen",
+  "Refillable water bottle",
+  "Comfortable walking shoes",
+  "Poncho",
+  "Autograph book & pen",
+];
 
 // WMO weather code -> [emoji, label]
 const WEATHER_CODES = {
@@ -121,6 +188,7 @@ const WEATHER_CODES = {
 
 let tripDays = loadTripDays();
 let tripInfo = loadTripInfo();
+let packingList = loadPackingList();
 let activeDayId = null;
 let activeParkItemsByPark = {}; // parkId -> { attractions, restaurants }
 let activeLiveDataByPark = {}; // parkId -> Map(attractionId -> { status, waitTime })
@@ -173,6 +241,22 @@ function loadTripInfo() {
 function saveTripInfo() {
   localStorage.setItem(TRIP_INFO_KEY, JSON.stringify(tripInfo));
   scheduleCloudPush();
+}
+
+// Packing list is device-local only — it isn't part of the cloud sync
+// payload, so it won't carry over to other synced devices.
+function loadPackingList() {
+  try {
+    const raw = localStorage.getItem(PACKING_KEY);
+    if (!raw) return DEFAULT_PACKING_ITEMS.map((text) => ({ id: uid(), text, checked: false }));
+    return JSON.parse(raw);
+  } catch (e) {
+    return DEFAULT_PACKING_ITEMS.map((text) => ({ id: uid(), text, checked: false }));
+  }
+}
+
+function savePackingList() {
+  localStorage.setItem(PACKING_KEY, JSON.stringify(packingList));
 }
 
 // ---------- Cloud Sync ----------
@@ -1213,12 +1297,14 @@ function renderItemList(listEl, items, pickField, renderExtra) {
     if (isPicked) li.classList.add("picked");
 
     const extra = renderExtra ? renderExtra(item) : "";
+    const heightBadge = pickField === "attractionPicks" ? buildHeightBadge(item.name) : "";
 
     li.innerHTML = `
       <label>
         <input type="checkbox" data-item-id="${item.id}" data-pick-field="${pickField}" ${isPicked ? "checked" : ""}>
         <span class="item-text">
           <span class="item-name">${item.name}</span>
+          ${heightBadge}
           ${isShowList ? extra : ""}
         </span>
         ${!isShowList ? extra : ""}
@@ -1342,7 +1428,7 @@ function renderItinRow(item) {
     <div class="itin-row" data-item-id="${item.id}" data-pick-field="${item.field}">
       <button type="button" class="remove-pick" data-item-id="${item.id}" data-pick-field="${item.field}" aria-label="Remove ${item.name}">&times;</button>
       <div class="itin-row-main">
-        <span>${item.emoji} <span class="itin-name">${item.name}</span></span>
+        <span>${item.emoji} <span class="itin-name">${item.name}</span> ${item.kind === "attraction" ? buildHeightBadge(item.name) : ""}</span>
         ${mainExtra}
       </div>
       ${controls ? `<div class="itin-row-controls">${controls}</div>` : ""}
@@ -1556,6 +1642,81 @@ function bindTodayPlanOpenButtons() {
   });
 }
 
+// ---------- Packing list ----------
+
+function renderPackingList() {
+  const listEl = document.getElementById("packing-list");
+  if (!listEl) return;
+
+  listEl.innerHTML = packingList
+    .map(
+      (item) => `
+        <li class="packing-item ${item.checked ? "checked" : ""}" data-packing-id="${item.id}">
+          <label>
+            <input type="checkbox" class="packing-check" data-packing-id="${item.id}" ${item.checked ? "checked" : ""}>
+            <span class="packing-item-text">${escapeHtml(item.text)}</span>
+          </label>
+          <button type="button" class="remove-packing-item" data-packing-id="${item.id}" aria-label="Remove ${escapeHtml(item.text)}">&times;</button>
+        </li>
+      `
+    )
+    .join("");
+
+  listEl.querySelectorAll(".packing-check").forEach((cb) => {
+    cb.addEventListener("change", () => togglePackingItem(cb.dataset.packingId));
+  });
+  listEl.querySelectorAll(".remove-packing-item").forEach((btn) => {
+    btn.addEventListener("click", () => removePackingItem(btn.dataset.packingId));
+  });
+}
+
+function addPackingItem(text) {
+  const trimmed = text.trim();
+  if (!trimmed) return;
+  packingList.push({ id: uid(), text: trimmed, checked: false });
+  savePackingList();
+  renderPackingList();
+}
+
+function togglePackingItem(itemId) {
+  const item = packingList.find((p) => p.id === itemId);
+  if (!item) return;
+  item.checked = !item.checked;
+  savePackingList();
+  renderPackingList();
+}
+
+function removePackingItem(itemId) {
+  packingList = packingList.filter((p) => p.id !== itemId);
+  savePackingList();
+  renderPackingList();
+}
+
+document.getElementById("packing-add-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const input = document.getElementById("packing-input");
+  addPackingItem(input.value);
+  input.value = "";
+  input.focus();
+});
+
+const PACKING_COLLAPSED_KEY = "disneyPackingCollapsed";
+
+function applyPackingCollapsedState() {
+  const collapsed = localStorage.getItem(PACKING_COLLAPSED_KEY) === "true";
+  document.getElementById("packing-section").classList.toggle("collapsed", collapsed);
+  document.getElementById("packing-toggle").setAttribute("aria-expanded", String(!collapsed));
+}
+
+document.getElementById("packing-toggle").addEventListener("click", () => {
+  const section = document.getElementById("packing-section");
+  const collapsed = section.classList.toggle("collapsed");
+  document.getElementById("packing-toggle").setAttribute("aria-expanded", String(!collapsed));
+  localStorage.setItem(PACKING_COLLAPSED_KEY, String(collapsed));
+});
+
+applyPackingCollapsedState();
+
 // ---------- Init ----------
 
 const WALT_QUOTES = [
@@ -1602,6 +1763,7 @@ async function init() {
   populateResortSelect();
   renderSyncSection();
   renderWaltQuote();
+  renderPackingList();
   renderAll();
 
   // If sync was already set up on a previous visit, pull the latest before

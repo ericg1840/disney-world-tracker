@@ -49,6 +49,20 @@
       <p class="empty-hint">No trip days yet. Tap "+ Add Day" to add your first reservation day.</p>
     </div>
   </section>
+
+  <section class="packing-section" id="packing-section">
+    <button type="button" class="days-header packing-toggle" id="packing-toggle">
+      <h2 class="section-heading">🎒 Packing List</h2>
+      <span class="packing-chevron" id="packing-chevron" aria-hidden="true">▾</span>
+    </button>
+    <div id="packing-body" class="packing-body">
+      <form id="packing-add-form" class="packing-add-row">
+        <input type="text" id="packing-input" class="text-field" placeholder="Add an item…" autocomplete="off">
+        <button type="submit" class="btn primary">+ Add</button>
+      </form>
+      <ul id="packing-list" class="packing-list"></ul>
+    </div>
+  </section>
 </main>
 
 <!-- Cloud Sync Modal -->
