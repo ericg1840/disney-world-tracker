@@ -51,6 +51,17 @@
     </div>
   </section>
 
+  <section class="family-section" id="family-section" aria-labelledby="family-heading">
+    <div class="family-header">
+      <div class="family-heading-wrap">
+        <h2 class="section-heading" id="family-heading">👨‍👩‍👧‍👦 Our Family</h2>
+        <span class="family-count" id="family-count">0 people</span>
+      </div>
+      <button type="button" class="btn primary" id="add-family-btn">+ Add Person</button>
+    </div>
+    <div id="family-list" class="family-list"></div>
+  </section>
+
   <section class="packing-section" id="packing-section">
     <button type="button" class="days-header packing-toggle" id="packing-toggle">
       <h2 class="section-heading">🎒 Packing List</h2>
@@ -93,6 +104,32 @@
     <div class="modal-footer">
       <button class="btn danger hidden" id="disconnect-sync-btn">Disconnect</button>
       <button class="btn primary" id="connect-sync-btn">Connect & Sync</button>
+    </div>
+  </div>
+</div>
+
+<!-- Family Profile Modal -->
+<div id="family-modal" class="modal-overlay hidden">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="family-modal-title">
+    <div class="modal-header">
+      <h3 id="family-modal-title">Add Family Member</h3>
+      <button type="button" class="icon-btn" id="family-cancel-btn" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body family-form-grid">
+      <input type="hidden" id="family-edit-id">
+      <label for="family-name">Name
+        <input type="text" id="family-name" class="text-field" maxlength="60" placeholder="e.g. Carter" autocomplete="off">
+      </label>
+      <label for="family-height">Height in inches <span class="label-hint">(optional)</span>
+        <input type="number" id="family-height" class="text-field" min="20" max="90" step="0.5" placeholder="e.g. 48">
+      </label>
+      <label for="family-emoji">Emoji
+        <input type="text" id="family-emoji" class="text-field" maxlength="4" value="👤" placeholder="👤">
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn" id="family-cancel-btn-footer">Cancel</button>
+      <button type="button" class="btn primary" id="family-save-btn">Save</button>
     </div>
   </div>
 </div>
@@ -176,5 +213,11 @@
 </div>
 
 <script src="app.js"></script>
+<script src="family.js"></script>
+<script>
+  document.getElementById("family-cancel-btn-footer")?.addEventListener("click", () => {
+    document.getElementById("family-modal")?.classList.add("hidden");
+  });
+</script>
 </body>
 </html>
