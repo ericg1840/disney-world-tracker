@@ -13,7 +13,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.111.0"></script>
 </head>
 <body>
-
 <header class="app-header">
   <div class="header-stars" aria-hidden="true"></div>
   <div class="header-inner">
@@ -22,202 +21,67 @@
     <p id="countdown-banner" class="countdown hidden"></p>
   </div>
 </header>
-
 <main>
-  <section id="sync-section" class="trip-info-section">
-    <div id="sync-content" class="trip-info-content"></div>
-  </section>
-
-  <section id="trip-info-section" class="trip-info-section">
-    <div id="trip-info-content" class="trip-info-content"></div>
-  </section>
-
-  <section id="weather-strip" class="weather-strip" aria-label="Weather forecast">
-    <p class="empty-hint">Add trip days below to see the forecast.</p>
-  </section>
-
-  <section id="today-plan-section" class="today-plan-section hidden">
-    <h2 id="today-plan-title">Today's Plan</h2>
-    <div id="today-plan-content" class="today-plan-content"></div>
-  </section>
-
+  <section id="sync-section" class="trip-info-section"><div id="sync-content" class="trip-info-content"></div></section>
+  <section id="trip-info-section" class="trip-info-section"><div id="trip-info-content" class="trip-info-content"></div></section>
+  <section id="weather-strip" class="weather-strip" aria-label="Weather forecast"><p class="empty-hint">Add trip days below to see the forecast.</p></section>
+  <section id="today-plan-section" class="today-plan-section hidden"><h2 id="today-plan-title">Today's Plan</h2><div id="today-plan-content" class="today-plan-content"></div></section>
   <section class="days-section">
-    <div class="days-header">
-      <h2 class="section-heading">Your Trip Days</h2>
-      <button id="add-day-btn" class="btn primary">+ Add Day</button>
-    </div>
-    <div id="days-list" class="days-list">
-      <p class="empty-hint">No trip days yet. Tap "+ Add Day" to add your first reservation day.</p>
-    </div>
+    <div class="days-header"><h2 class="section-heading">Your Trip Days</h2><button id="add-day-btn" class="btn primary">+ Add Day</button></div>
+    <div id="days-list" class="days-list"><p class="empty-hint">No trip days yet. Tap "+ Add Day" to add your first reservation day.</p></div>
   </section>
-
   <section class="family-section" id="family-section" aria-labelledby="family-heading">
     <div class="family-header">
-      <div class="family-heading-wrap">
-        <h2 class="section-heading" id="family-heading">👨‍👩‍👧‍👦 Our Family</h2>
-        <span class="family-count" id="family-count">0 people</span>
-      </div>
+      <div class="family-heading-wrap"><h2 class="section-heading" id="family-heading">👨‍👩‍👧‍👦 Our Family</h2><span class="family-count" id="family-count">0 people</span></div>
       <button type="button" class="btn primary" id="add-family-btn">+ Add Person</button>
     </div>
     <div id="family-list" class="family-list"></div>
   </section>
-
   <section class="packing-section" id="packing-section">
-    <button type="button" class="days-header packing-toggle" id="packing-toggle">
-      <h2 class="section-heading">🎒 Packing List</h2>
-      <span class="packing-chevron" id="packing-chevron" aria-hidden="true">▾</span>
-    </button>
-    <div id="packing-body" class="packing-body">
-      <form id="packing-add-form" class="packing-add-row">
-        <input type="text" id="packing-input" class="text-field" placeholder="Add an item…" autocomplete="off">
-        <button type="submit" class="btn primary">+ Add</button>
-      </form>
-      <ul id="packing-list" class="packing-list"></ul>
-    </div>
+    <button type="button" class="days-header packing-toggle" id="packing-toggle"><h2 class="section-heading">🎒 Packing List</h2><span class="packing-chevron" id="packing-chevron" aria-hidden="true">▾</span></button>
+    <div id="packing-body" class="packing-body"><form id="packing-add-form" class="packing-add-row"><input type="text" id="packing-input" class="text-field" placeholder="Add an item…" autocomplete="off"><button type="submit" class="btn primary">+ Add</button></form><ul id="packing-list" class="packing-list"></ul></div>
   </section>
 </main>
 
-<!-- Cloud Sync Modal -->
-<div id="sync-modal" class="modal-overlay hidden">
-  <div class="modal">
-    <div class="modal-header">
-      <h3>☁️ Cloud Sync</h3>
-      <button class="icon-btn close-modal" data-close="sync-modal">&times;</button>
-    </div>
-    <div class="modal-body">
-      <p class="empty-hint">Cloud sync is currently configured with a private share code. We are moving this to account-based authentication so you can securely share trips with family members.</p>
+<div id="sync-modal" class="modal-overlay hidden"><div class="modal"><div class="modal-header"><h3>☁️ Cloud Sync</h3><button class="icon-btn close-modal" data-close="sync-modal">&times;</button></div><div class="modal-body">
+  <p class="empty-hint">Cloud sync is currently configured with a private share code. We are moving this to account-based authentication so you can securely share trips with family members.</p>
+  <label for="sync-url">Supabase project URL</label><input type="text" id="sync-url" class="text-field" placeholder="https://xxxxx.supabase.co">
+  <label for="sync-anon-key">Supabase anon public key</label><input type="text" id="sync-anon-key" class="text-field" placeholder="eyJhbGciOi...">
+  <label for="sync-code-input">Sync code</label><div class="sync-code-row"><input type="text" id="sync-code-input" class="text-field sync-code-field" placeholder="e.g. 7F3KQPXZ"><button type="button" class="btn primary" id="generate-sync-code-btn">Generate</button></div>
+  <p id="sync-status-msg" class="empty-hint"></p></div><div class="modal-footer"><button class="btn danger hidden" id="disconnect-sync-btn">Disconnect</button><button class="btn primary" id="connect-sync-btn">Connect & Sync</button></div></div></div>
 
-      <label for="sync-url">Supabase project URL</label>
-      <input type="text" id="sync-url" class="text-field" placeholder="https://xxxxx.supabase.co">
-
-      <label for="sync-anon-key">Supabase anon public key</label>
-      <input type="text" id="sync-anon-key" class="text-field" placeholder="eyJhbGciOi...">
-
-      <label for="sync-code-input">Sync code</label>
-      <div class="sync-code-row">
-        <input type="text" id="sync-code-input" class="text-field sync-code-field" placeholder="e.g. 7F3KQPXZ">
-        <button type="button" class="btn primary" id="generate-sync-code-btn">Generate</button>
-      </div>
-
-      <p id="sync-status-msg" class="empty-hint"></p>
-    </div>
-    <div class="modal-footer">
-      <button class="btn danger hidden" id="disconnect-sync-btn">Disconnect</button>
-      <button class="btn primary" id="connect-sync-btn">Connect & Sync</button>
-    </div>
+<div id="family-modal" class="modal-overlay hidden"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="family-modal-title">
+  <div class="modal-header"><h3 id="family-modal-title">Add Family Member</h3><button type="button" class="icon-btn" id="family-close-btn" aria-label="Close">&times;</button></div>
+  <div class="modal-body family-form-grid"><input type="hidden" id="family-edit-id">
+    <label for="family-name">Name<input type="text" id="family-name" class="text-field" maxlength="60" placeholder="e.g. Carter" autocomplete="off"></label>
+    <label for="family-height">Height in inches <span class="label-hint">(optional)</span><input type="number" id="family-height" class="text-field" min="20" max="90" step="0.5" placeholder="e.g. 48"></label>
+    <label for="family-emoji">Emoji<input type="text" id="family-emoji" class="text-field" maxlength="4" value="👤" placeholder="👤"></label>
   </div>
-</div>
+  <div class="modal-footer"><button type="button" class="btn" id="family-cancel-btn">Cancel</button><button type="button" class="btn primary" id="family-save-btn">Save</button></div>
+</div></div>
 
-<!-- Family Profile Modal -->
-<div id="family-modal" class="modal-overlay hidden">
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="family-modal-title">
-    <div class="modal-header">
-      <h3 id="family-modal-title">Add Family Member</h3>
-      <button type="button" class="icon-btn" id="family-cancel-btn" aria-label="Close">&times;</button>
-    </div>
-    <div class="modal-body family-form-grid">
-      <input type="hidden" id="family-edit-id">
-      <label for="family-name">Name
-        <input type="text" id="family-name" class="text-field" maxlength="60" placeholder="e.g. Carter" autocomplete="off">
-      </label>
-      <label for="family-height">Height in inches <span class="label-hint">(optional)</span>
-        <input type="number" id="family-height" class="text-field" min="20" max="90" step="0.5" placeholder="e.g. 48">
-      </label>
-      <label for="family-emoji">Emoji
-        <input type="text" id="family-emoji" class="text-field" maxlength="4" value="👤" placeholder="👤">
-      </label>
-    </div>
-    <div class="modal-footer">
-      <button type="button" class="btn" id="family-cancel-btn-footer">Cancel</button>
-      <button type="button" class="btn primary" id="family-save-btn">Save</button>
-    </div>
-  </div>
-</div>
+<div id="trip-info-modal" class="modal-overlay hidden"><div class="modal"><div class="modal-header"><h3>Resort & Confirmation</h3><button class="icon-btn close-modal" data-close="trip-info-modal">&times;</button></div><div class="modal-body">
+  <label for="trip-info-resort-select">Resort</label><select id="trip-info-resort-select"></select><input type="text" id="trip-info-resort-other" class="text-field hidden" placeholder="Enter resort name">
+  <label for="trip-info-confirmation">Confirmation number</label><input type="text" id="trip-info-confirmation" class="text-field" placeholder="e.g. 1234567890">
+  <label for="trip-info-checkin">Check-in date</label><input type="date" id="trip-info-checkin">
+  <label for="trip-info-checkout">Check-out date</label><input type="date" id="trip-info-checkout">
+</div><div class="modal-footer"><button class="btn primary" id="save-trip-info-btn">Save</button></div></div></div>
 
-<!-- Trip Info Modal -->
-<div id="trip-info-modal" class="modal-overlay hidden">
-  <div class="modal">
-    <div class="modal-header">
-      <h3>Resort & Confirmation</h3>
-      <button class="icon-btn close-modal" data-close="trip-info-modal">&times;</button>
-    </div>
-    <div class="modal-body">
-      <label for="trip-info-resort-select">Resort</label>
-      <select id="trip-info-resort-select"></select>
-      <input type="text" id="trip-info-resort-other" class="text-field hidden" placeholder="Enter resort name">
+<div id="add-day-modal" class="modal-overlay hidden"><div class="modal"><div class="modal-header"><h3>Add Trip Days</h3><button class="icon-btn close-modal" data-close="add-day-modal">&times;</button></div><div class="modal-body"><label for="new-day-start">First day of trip</label><input type="date" id="new-day-start"><label for="new-day-end">Last day of trip</label><input type="date" id="new-day-end"><p id="add-day-error" class="error-hint hidden"></p></div><div class="modal-footer"><button class="btn primary" id="confirm-add-day">Add</button></div></div></div>
 
-      <label for="trip-info-confirmation">Confirmation number</label>
-      <input type="text" id="trip-info-confirmation" class="text-field" placeholder="e.g. 1234567890">
-
-      <label for="trip-info-checkin">Check-in date</label>
-      <input type="date" id="trip-info-checkin">
-
-      <label for="trip-info-checkout">Check-out date</label>
-      <input type="date" id="trip-info-checkout">
-    </div>
-    <div class="modal-footer">
-      <button class="btn primary" id="save-trip-info-btn">Save</button>
-    </div>
-  </div>
-</div>
-
-<!-- Add Day Modal -->
-<div id="add-day-modal" class="modal-overlay hidden">
-  <div class="modal">
-    <div class="modal-header">
-      <h3>Add Trip Days</h3>
-      <button class="icon-btn close-modal" data-close="add-day-modal">&times;</button>
-    </div>
-    <div class="modal-body">
-      <label for="new-day-start">First day of trip</label>
-      <input type="date" id="new-day-start">
-      <label for="new-day-end">Last day of trip</label>
-      <input type="date" id="new-day-end">
-      <p id="add-day-error" class="error-hint hidden"></p>
-    </div>
-    <div class="modal-footer">
-      <button class="btn primary" id="confirm-add-day">Add</button>
-    </div>
-  </div>
-</div>
-
-<!-- Day Detail Modal -->
-<div id="day-detail-modal" class="modal-overlay hidden">
-  <div class="modal modal-large">
-    <div class="modal-header">
-      <h3 id="detail-date-title">Day</h3>
-      <button class="icon-btn close-modal" data-close="day-detail-modal">&times;</button>
-    </div>
-    <div class="modal-body">
-      <label>Parks <span class="label-hint">(pick one or more — park hopping welcome!)</span></label>
-      <div id="park-picker" class="park-picker"></div>
-
-      <button type="button" id="refresh-wait-times-btn" class="tp-link-btn hidden">🔄 Refresh wait times & showtimes</button>
-
-      <label for="day-notes">Notes <span class="label-hint">(optional — reminders, packing, anything)</span></label>
-      <textarea id="day-notes" class="day-notes" rows="2" placeholder="e.g. Bring stroller, arrive early for rope drop…"></textarea>
-
-      <div id="itinerary" class="itinerary hidden">
-        <h4>🗓️ Your itinerary</h4>
-        <div id="itinerary-sections" class="itinerary-sections"></div>
-      </div>
-
-      <p id="park-empty-hint" class="empty-hint">Pick a park above to see rides & restaurants.</p>
-
-      <div id="park-sections" class="park-sections"></div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn primary" id="save-day-btn">Save</button>
-    </div>
-  </div>
-</div>
+<div id="day-detail-modal" class="modal-overlay hidden"><div class="modal modal-large"><div class="modal-header"><h3 id="detail-date-title">Day</h3><button class="icon-btn close-modal" data-close="day-detail-modal">&times;</button></div><div class="modal-body">
+  <label>Parks <span class="label-hint">(pick one or more — park hopping welcome!)</span></label><div id="park-picker" class="park-picker"></div>
+  <button type="button" id="refresh-wait-times-btn" class="tp-link-btn hidden">🔄 Refresh wait times & showtimes</button>
+  <label for="day-notes">Notes <span class="label-hint">(optional — reminders, packing, anything)</span></label><textarea id="day-notes" class="day-notes" rows="2" placeholder="e.g. Bring stroller, arrive early for rope drop…"></textarea>
+  <div id="itinerary" class="itinerary hidden"><h4>🗓️ Your itinerary</h4><div id="itinerary-sections" class="itinerary-sections"></div></div>
+  <p id="park-empty-hint" class="empty-hint">Pick a park above to see rides & restaurants.</p><div id="park-sections" class="park-sections"></div>
+</div><div class="modal-footer"><button class="btn primary" id="save-day-btn">Save</button></div></div></div>
 
 <script src="app.js"></script>
 <script src="family.js"></script>
 <script>
-  document.getElementById("family-cancel-btn-footer")?.addEventListener("click", () => {
-    document.getElementById("family-modal")?.classList.add("hidden");
-  });
+  document.getElementById("family-close-btn")?.addEventListener("click", () => document.getElementById("family-modal")?.classList.add("hidden"));
+  document.getElementById("family-cancel-btn")?.addEventListener("click", () => document.getElementById("family-modal")?.classList.add("hidden"));
 </script>
 </body>
 </html>
