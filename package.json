@@ -1,0 +1,14 @@
+{
+  "name": "disney-world-tracker",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Family-focused Disney World trip planner",
+  "scripts": {
+    "check:js": "node --check app.js && node --check family.js && node --check enhancements.js && node --check metadata-sync.js && node --check auth.js && node --check planner.js",
+    "check:html": "html-validate index.html",
+    "check": "npm run check:js && npm run check:html"
+  },
+  "devDependencies": {
+    "html-validate": "^9.50.0"
+  }
+}

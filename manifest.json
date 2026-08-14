@@ -1,0 +1,10 @@
+{
+  "name": "Disney World Trip Tracker",
+  "short_name": "Disney Tracker",
+  "description": "Plan and track your Disney World family trip.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6f2fb",
+  "theme_color": "#6b2fa0",
+  "icons": []
+}
