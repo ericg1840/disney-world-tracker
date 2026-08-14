@@ -9,7 +9,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Pin the SDK version so a future CDN release cannot silently change app behavior. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.111.0"></script>
 </head>
 <body>
 
@@ -73,7 +74,7 @@
       <button class="icon-btn close-modal" data-close="sync-modal">&times;</button>
     </div>
     <div class="modal-body">
-      <p class="empty-hint">Connect once, then enter the same sync code on each device to see this trip everywhere. Treat the code like a private share link — anyone who has it can view and edit this trip.</p>
+      <p class="empty-hint">Cloud sync is currently configured with a private share code. We are moving this to account-based authentication so you can securely share trips with family members.</p>
 
       <label for="sync-url">Supabase project URL</label>
       <input type="text" id="sync-url" class="text-field" placeholder="https://xxxxx.supabase.co">
