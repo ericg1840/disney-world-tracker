@@ -35,6 +35,7 @@
 <script src="metadata-sync.js"></script>
 <script src="auth.js"></script>
 <script src="planner.js"></script>
+<script src="mobile-nav.js"></script>
 <script>document.getElementById("family-close-btn")?.addEventListener("click",()=>document.getElementById("family-modal")?.classList.add("hidden"));document.getElementById("family-cancel-btn")?.addEventListener("click",()=>document.getElementById("family-modal")?.classList.add("hidden"));if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("./service-worker.js").catch(error=>console.warn("Offline mode unavailable:",error)));}</script>
 </body>
 </html>
