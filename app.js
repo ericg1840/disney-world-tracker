@@ -689,15 +689,20 @@ document.getElementById("save-trip-info-btn").addEventListener("click", () => {
 
 function renderDaysList() {
   const container = document.getElementById("days-list");
+  const todayIso = isoDate(new Date());
+  const upcomingDays = tripDays.filter((day) => day.date >= todayIso);
+
   if (tripDays.length === 0) {
     container.innerHTML = '<p class="empty-hint">No trip days yet. Tap "+ Add Day" to add your first reservation day.</p>';
     return;
   }
-
-  const todayIso = isoDate(new Date());
+  if (upcomingDays.length === 0) {
+    container.innerHTML = '<p class="empty-hint">No upcoming trip days. Past days are kept but hidden from this list.</p>';
+    return;
+  }
 
   container.innerHTML = "";
-  for (const day of tripDays) {
+  for (const day of upcomingDays) {
     const isToday = day.date === todayIso;
     const card = document.createElement("div");
     card.className = isToday ? "day-card is-today" : "day-card";
