@@ -254,8 +254,17 @@ function hookEnhancementEvents() {
       setTimeout(() => { renderSmartDashboard(); renderDayTimeline(); scheduleMetadataSync(); }, 150);
     }
   });
-  const observer = new MutationObserver(() => { enhanceRideLists(); renderDayTimeline(); });
-  observer.observe(document.body, { childList: true, subtree: true });
+  // Scoped to #park-sections only, and only calling the idempotent
+  // enhanceRideLists (it skips anything already marked data-enhanced) —
+  // watching document.body and also calling renderDayTimeline here caused
+  // an infinite mutation loop: renderDayTimeline's innerHTML write is
+  // itself a mutation, which re-triggered the observer forever and froze
+  // the page whenever the DOM churned a lot (e.g. picking a park).
+  const parkSections = document.getElementById("park-sections");
+  if (parkSections) {
+    const observer = new MutationObserver(() => enhanceRideLists());
+    observer.observe(parkSections, { childList: true, subtree: true });
+  }
 }
 
 function initEnhancements() {
